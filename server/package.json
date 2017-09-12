@@ -1,0 +1,19 @@
+{
+  "name": "rampweb",
+  "version": "0.1.0",
+  "description": "EOC RAMP Backend",
+  "main": "server.js",
+  "engines": {
+    "node": ">= 8.0.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "express": "^4.15.4",
+    "express-ws": "^3.0.0",
+    "mysql2": "^1.4.2"
+  }
+}

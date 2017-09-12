@@ -1,0 +1,9 @@
+{
+    "mysql": {
+        "host": "localhost",
+        "user": "ramp",
+        "password": "",
+        "database": "ramp",
+        "log_queries": true
+    }
+}
