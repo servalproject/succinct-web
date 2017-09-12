@@ -1,6 +1,6 @@
 'use strict';
 
-function add_cursors(teams, before) {
+function add_team_cursors(teams, before) {
     var team_fields = ['id', 'name', 'started', 'finished'];
     var member_fields = ['member_id', 'name', 'identity', 'joined', 'parted', 'lat', 'lng', 'accuracy', 'time'];
     var chat_fields = ['id', 'time', 'sender', 'message'];
@@ -48,7 +48,7 @@ function add_cursors(teams, before) {
 }
 
 module.exports = {
-    add_cursors: add_cursors
+    add_team_cursors: add_team_cursors
 };
 
 function copy_fields(input, fields) {

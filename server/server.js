@@ -63,7 +63,7 @@ function authenticate(data, conn) {
     // try to ensure that rpc-response arrives before push data
     conn.timer(function () {
         conn.subscribed = true;
-        conn.push('/teams', teamdata.add_cursors(active));
+        conn.push('/teams', teamdata.add_team_cursors(active));
     }, 50);
 
     return true;
