@@ -3,7 +3,6 @@
 function add_team_cursors(teams, before) {
     var team_fields = ['id', 'name', 'started', 'finished'];
     var member_fields = ['member_id', 'name', 'identity', 'joined', 'parted', 'lat', 'lng', 'accuracy', 'time'];
-    var chat_fields = ['id', 'time', 'sender', 'message'];
 
     var out = {
         data: [],
@@ -25,18 +24,9 @@ function add_team_cursors(teams, before) {
         for (let member of team.members) {
             oteam.members.push(copy_fields(member, member_fields));
         }
-        oteam.chat = {
-            data: [],
-            links: {
-                'self': ['/team/'+team.id+'/chat', {}],
-            }
-        };
-        for (let chat of team.chats) {
-            oteam.chat.data.push(copy_fields(chat, chat_fields));
-        }
-        if (team.chats.length && !team.chats[team.chats.length-1].is_last_record) {
-            oteam.chat.links.older = ['/team/'+team.id+'/chat', {before: team.chats[team.chats.length-1].time}];
-        }
+
+        oteam.chat = add_chat_cursors(team.chats, team.id);
+
         out.data.push(oteam);
     }
 
