@@ -47,8 +47,32 @@ function add_team_cursors(teams, before) {
     return out;
 }
 
+function add_chat_cursors(chats, id, before) {
+    var chat_fields = ['id', 'time', 'sender', 'message'];
+
+    var out = {
+        data: [],
+        links: {
+            'self': ['/team/'+id+'/chat', {}]
+        }
+    };
+
+    if (before instanceof Date) {
+        out.links['self'][1].before = before.toISOString();
+    }
+
+    chats.forEach(chat => out.data.push(copy_fields(chat, chat_fields)));
+
+    if (chats.length && !chats[chats.length-1].is_last_record) {
+        out.links.older = ['/team/'+id+'/chat', {before: chats[chats.length-1].time}];
+    }
+
+    return out;
+}
+
 module.exports = {
-    add_team_cursors: add_team_cursors
+    add_team_cursors: add_team_cursors,
+    add_chat_cursors: add_chat_cursors
 };
 
 function copy_fields(input, fields) {

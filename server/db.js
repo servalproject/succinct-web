@@ -64,6 +64,30 @@ class Db {
         return to_normal_object(teams);
     }
 
+    async chats_before(teamid, date, chatlimit) {
+        if (!Number.isInteger(chatlimit) || chatlimit < 1) {
+            throw new Error('unexpected team limit');
+        }
+        var limit = chatlimit+1; // get one extra record to ensure different timestamp
+        var [chats] = await this.execute('SELECT * FROM chat WHERE team = ? AND time < FROM_UNIXTIME(?) ORDER BY time DESC LIMIT '+limit, [teamid, date.getTime()/1000]);
+        if (chats.length == 0) {
+            // no special handling required
+        } else if (chats.length < limit) {
+            chats[chats.length-1].is_last_record = true;
+        } else if (chats[chats.length-1].time.getTime() != chats[chats.length-2].time.getTime()) {
+            // extra record has different timestamp
+            // just remove it
+            chats.splice(-1,1);
+        } else {
+            let lastchat = chats[chats.length-1].time.getTime();
+            let idlist = [];
+            chats.forEach(chat => { if (chat.time.getTime() == lastchat) idlist.push(chat.id); });
+            let [morechats] = await this.query('SELECT * FROM chat WHERE team = ? AND time = FROM_UNIXTIME(?) AND id NOT IN ('+idlist.join(',')+')', [teamid, lastchat/1000]);
+            chats = chats.concat(morechats);
+        }
+        return to_normal_object(chats);
+    }
+
     // does not use mysql2 cached statements
     async query(sql, vals, ...args) {
         var result = await this.conn.query(sql, vals, ...args);

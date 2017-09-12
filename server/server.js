@@ -100,7 +100,7 @@ async function get_teams(options, conn) {
                 }
                 break;
             default:
-                conn.warn('unknown option', option);
+                conn.warn('unknown option for /teams', option);
                 return ['fail', 'unknown option'];
         }
     }
@@ -110,12 +110,33 @@ async function get_teams(options, conn) {
     }
     conn.log('getting teams before', before);
     var teams = await db.teams_before(before, 20);
-    return teamdata.add_cursors(teams, before);
+    return teamdata.add_team_cursors(teams, before);
 }
 
 async function get_team_chat(options, conn, path, match) {
     // note regex in grant_access ensures we have a proper integer here
     var id = parseInt(match[1]);
-    conn.warn('get_team_chat() not implemented');
-    return false;
+    var before = null;
+    for (let option in options) {
+        let value = options[option];
+        switch (option) {
+            case 'before':
+                if (typeof value == 'string' && !Number.isNaN(Date.parse(value))) {
+                    before = new Date(value);
+                } else {
+                    return ['fail', 'invalid before= value'];
+                }
+                break;
+            default:
+                conn.warn('unknown option for /team/<id>/chat', option);
+                return ['fail', 'unknown option'];
+        }
+    }
+    if (before === null) {
+        // published with team data, shouldn't be requested manually
+        return ['fail', 'not implemented'];
+    }
+    conn.log('getting chats for team '+id+' before', before);
+    var chats = await db.chats_before(id, before, 20);
+    return teamdata.add_chat_cursors(chats, id, before);
 }
