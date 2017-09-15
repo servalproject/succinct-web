@@ -138,7 +138,7 @@ async function auto_query_more(db, basequery, where, timefield, before, idfield,
         sql += timefield + ' < FROM_UNIXTIME(?)';
         args.push(before.getTime()/1000);
     }
-    sql += ' ORDER BY ' + timefield + ' DESC LIMIT ' + limit;
+    sql += ' ORDER BY ' + timefield + ' DESC, ' + idfield + ' DESC LIMIT ' + limit;
 
     var [rows] = await db.execute(sql, args);
 
@@ -158,7 +158,8 @@ async function auto_query_more(db, basequery, where, timefield, before, idfield,
         rows.forEach(row => { if (row[timefield].getTime() == lasttime) idlist.push(row[idfield]); });
         let moresql = basequery + ' WHERE ' + (where ? where + ' AND ' : '')
             + timefield + ' = FROM_UNIXTIME(?)'
-            + ' AND ' + idfield + ' NOT IN (' + idlist.join(',') + ')';
+            + ' AND ' + idfield + ' NOT IN (' + idlist.join(',') + ')'
+            + ' ORDER BY ' + idfield + ' DESC';
         if (before) {
             // remove before parameter added earlier
             args.pop();
