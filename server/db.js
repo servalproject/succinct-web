@@ -34,31 +34,13 @@ class Db {
         if (!Number.isInteger(teamlimit) || teamlimit < 1) {
             throw new Error('unexpected team limit');
         }
-        var limit = teamlimit+1; // add 1 to limit to ensure that next record has a different timestamp
         var teams;
         if (date === 'now') {
-            [teams] = await this.execute('SELECT * FROM teams WHERE finished IS NOT NULL ORDER BY finished DESC LIMIT '+limit);
+            teams = await auto_query_more(this, 'SELECT * FROM teams', 'finished IS NOT NULL', 'finished', null, 'id', [], teamlimit);
         } else if (date instanceof Date) {
-            [teams] = await this.execute('SELECT * FROM teams WHERE finished < FROM_UNIXTIME(?) ORDER BY finished DESC LIMIT '+limit, [date.getTime()/1000]);
+            teams = await auto_query_more(this, 'SELECT * FROM teams', '', 'finished', date, 'id', [], teamlimit);
         } else {
             throw new Error('unexpected date');
-        }
-        if (teams.length == 0) {
-            // no special handling required
-        } else if (teams.length < limit) {
-            teams[teams.length-1].is_last_record = true;
-        } else if (teams[teams.length-1].finished.getTime() != teams[teams.length-2].finished.getTime()) {
-            // extra record has different timestamp
-            // just remove it
-            teams.splice(-1,1);
-        } else {
-            // extra record has the same timestamp
-            // need to get all other records with the same timestamp
-            let lastfinished = teams[teams.length-1].finished.getTime();
-            let idlist = [];
-            teams.forEach(team => { if (team.finished.getTime() == lastfinished) idlist.push(team.id); });
-            let [moreteams] = await this.query('SELECT * FROM teams WHERE finished = FROM_UNIXTIME(?) AND id NOT IN ('+idlist.join(',')+')', [lastfinished/1000]);
-            teams = teams.concat(moreteams);
         }
         await fill_team_data(this, teams, 1);
         return to_normal_object(teams);
@@ -68,23 +50,7 @@ class Db {
         if (!Number.isInteger(chatlimit) || chatlimit < 1) {
             throw new Error('unexpected team limit');
         }
-        var limit = chatlimit+1; // get one extra record to ensure different timestamp
-        var [chats] = await this.execute('SELECT * FROM chat WHERE team = ? AND time < FROM_UNIXTIME(?) ORDER BY time DESC LIMIT '+limit, [teamid, date.getTime()/1000]);
-        if (chats.length == 0) {
-            // no special handling required
-        } else if (chats.length < limit) {
-            chats[chats.length-1].is_last_record = true;
-        } else if (chats[chats.length-1].time.getTime() != chats[chats.length-2].time.getTime()) {
-            // extra record has different timestamp
-            // just remove it
-            chats.splice(-1,1);
-        } else {
-            let lastchat = chats[chats.length-1].time.getTime();
-            let idlist = [];
-            chats.forEach(chat => { if (chat.time.getTime() == lastchat) idlist.push(chat.id); });
-            let [morechats] = await this.query('SELECT * FROM chat WHERE team = ? AND time = FROM_UNIXTIME(?) AND id NOT IN ('+idlist.join(',')+')', [teamid, lastchat/1000]);
-            chats = chats.concat(morechats);
-        }
+        var chats = await auto_query_more(this, 'SELECT * FROM chat', 'team = ?', 'time', date, 'id', [teamid], chatlimit);
         return to_normal_object(chats);
     }
 
@@ -129,28 +95,80 @@ async function fill_team_data(db, teams, chatlimit) {
         return;
     }
     for (let i=0; i<teams.length; i++) {
-        let team = teams[i];
-        let limit = chatlimit + 1; // get one extra record to ensure different timestamp
-        let [chats] = await db.execute('SELECT * FROM chat WHERE team = ? ORDER BY time DESC LIMIT '+limit, [team.id]);
-        if (chats.length == 0) {
-            // no special handling required
-        } else if (chats.length < limit) {
-            chats[chats.length-1].is_last_record = true;
-        } else if (chats[chats.length-1].time.getTime() != chats[chats.length-2].time.getTime()) {
-            // extra record has different timestamp
-            // just remove it
-            chats.splice(-1,1);
-        } else {
-            // extra record has same timestamp
-            // need to get all other chat messages with the same timestamp
-            let lastchat = chats[chats.length-1].time.getTime();
-            let idlist = [];
-            chats.forEach(chat => { if (chat.time.getTime() == lastchat) idlist.push(chat.id); });
-            let [morechats] = await db.query('SELECT * FROM chat WHERE team = ? AND time = FROM_UNIXTIME(?) AND id NOT IN ('+idlist.join(',')+')', [team.id, lastchat/1000]);
-            chats = chats.concat(morechats);
-        }
-        team.chats = chats;
+        teams[i].chats = await db.chats_before(teams[i].id, null, chatlimit);
     }
+}
+
+/* to be able to query data with time < TIMESTAMP, we need to guarantee that
+ * the timestamp of the last returned record is not shared by any records other
+ * than those in the result set.
+ *
+ * in practice, we resolve this by requesting 1 more record than requested, and
+ * requesting additional records only when necessary.
+ *
+ * if we receive fewer than n+1 records, the results contain the final record.
+ *
+ * if we receive n+1 records and the nth and (n+1)th record have different
+ * timestamps, we throw away the (n+1)th record.
+ *
+ * if the nth and (n+1)th record have identical timestamps, we make one further
+ * database request to get all the other records with this timestamp.
+ */
+async function auto_query_more(db, basequery, where, timefield, before, idfield, params, n) {
+    if (n <= 0) throw new Error('invalid n');
+
+    if (typeof params == 'undefined' || params === null) params = [];
+
+    var limit = n+1; // request one extra record
+    var args = (params ? params.slice() : []);
+
+    if (args.length != ((where || '').match(/\?/g) || []).length) {
+        throw new Error ('params do not match where query placeholders');
+    }
+
+    var sql = basequery;
+    if (where || before) {
+        sql += ' WHERE ';
+    }
+    if (where) {
+        sql += where;
+        if (before) sql += ' AND ';
+    }
+    if (before) {
+        sql += timefield + ' < FROM_UNIXTIME(?)';
+        args.push(before.getTime()/1000);
+    }
+    sql += ' ORDER BY ' + timefield + ' DESC LIMIT ' + limit;
+
+    var [rows] = await db.execute(sql, args);
+
+    if (rows.length == 0) {
+        // no special handling required
+    } else if (rows.length < limit) {
+        // add is_last_record property
+        rows[rows.length-1].is_last_record = true;
+    } else if (rows[rows.length-1][timefield].getTime() != rows[rows.length-2][timefield].getTime()) {
+        // extra record has a different timestamp, just remove it
+        rows.pop();
+    } else {
+        // extra record has the same timestamp
+        // need to get all other records with the same timestamp
+        let lasttime = rows[rows.length-1][timefield].getTime();
+        let idlist = []; // ids of all results in the current set with this timestamp
+        rows.forEach(row => { if (row[timefield].getTime() == lasttime) idlist.push(row[idfield]); });
+        let moresql = basequery + ' WHERE ' + (where ? where + ' AND ' : '')
+            + timefield + ' = FROM_UNIXTIME(?)'
+            + ' AND ' + idfield + ' NOT IN (' + idlist.join(',') + ')';
+        if (before) {
+            // remove before parameter added earlier
+            args.pop();
+        }
+        args.push(lasttime/1000);
+        let [more] = await db.query(moresql, args);
+        rows = rows.concat(more);
+    }
+
+    return rows;
 }
 
 // return object where array's keys are now its values and vice versa
