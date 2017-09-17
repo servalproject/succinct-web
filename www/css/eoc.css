@@ -20,7 +20,7 @@ body {
 
 .sidebar {
     display: block;
-    min-width: 250px;
+    width: 250px;
     height: 100%;
     max-width: 100%;
     float: left;
@@ -48,5 +48,43 @@ body {
 .teamlist .team {
     padding-top: 1em;
     padding-bottom: 1em;
-    border-top: 1px solid grey;
+    border-bottom: 1px solid grey;
+}
+
+.teamname {
+    font-weight: bold;
+}
+
+.teamname .teammembers {
+    font-weight: normal;
+    font-size: 80%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.team .lastmsg {
+    font-size: 80%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.lastmsg time {
+    padding-right: 0.5em;
+    font-size: 90%;
+    color: #559;
+}
+
+.lastmsg span.sender {
+    padding-right: 0.5em;
+    color: #955;
+}
+
+.message.join, .message.part {
+    color: #666;
+}
+
+.template {
+    display: none;
 }
