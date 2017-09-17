@@ -27,12 +27,11 @@ body {
     border: 1px solid rgba(0,0,0,.125);
 }
 
-#teams {
-    height: 100%;
+#teams, #chat {
     padding-top: 3rem;
 }
 
-#teams .card-header {
+#teams .card-header, #chat .card-header {
     margin-top: -3rem;
 }
 
@@ -87,4 +86,52 @@ body {
 
 .template {
     display: none;
+}
+
+#chat {
+    width: 350px;
+}
+
+#chat #memberlist {
+    max-height: 30%;
+    overflow-y: auto;
+}
+
+#chat #chatlog {
+    background: #eee;
+    overflow-y: auto;
+}
+
+#chatlog > div {
+    -webkit-flex: 0 0 auto;
+    -ms-flexbox: 0 0 auto;
+    flex: 0 0 auto;
+}
+
+#chatlog > div:first-child {
+    margin-top: auto;
+}
+
+.flex {
+    display: -webkit-flex;
+    display: -ms-flexbox;
+    display: flex;
+}
+
+.flex-col {
+    -webkit-flex-direction: column;
+    -ms-flex-direction: column;
+    flex-direction: column;
+}
+
+.flex-inflexible {
+    -webkit-flex: 0 0 auto;
+    -ms-flexbox: 0 0 auto;
+    flex: 0 0 auto;
+}
+
+.flex-flexible {
+    -webkit-flex: 1 1 auto;
+    -ms-flexbox: 1 1 auto;
+    flex: 1 1 auto;
 }
