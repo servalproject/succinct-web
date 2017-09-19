@@ -33,6 +33,7 @@ body {
 
 #teams .card-header, #chat .card-header {
     margin-top: -3rem;
+    height: 3rem;
 }
 
 #teams .card-block {
@@ -48,6 +49,7 @@ body {
     padding-top: 1em;
     padding-bottom: 1em;
     border-bottom: 1px solid grey;
+    cursor: pointer;
 }
 
 .teamname {
@@ -92,6 +94,10 @@ body {
     width: 350px;
 }
 
+#chat #members {
+    margin: 1px; /* hopefully prevents scrollbars from appearing erroneously */
+}
+
 #chat #memberlist {
     max-height: 30%;
     overflow-y: auto;
@@ -108,7 +114,67 @@ body {
     flex: 0 0 auto;
 }
 
-#chatlog > div:first-child {
+#members > .leader {
+    font-weight: bold;
+}
+
+.msg {
+    width: 100%;
+    padding-left: 0.25em;
+    padding-right: 0.25em;
+    margin-left: 0;
+    margin-right: auto;
+    margin-bottom: 0.25em;
+}
+
+.msg > .sender {
+    font-size: 70%;
+    font-weight: bold;
+    display: block;
+}
+
+.msg > .message {
+    max-width: 75%;
+    background: #ff9;
+    display: inline-block;
+    padding: 0.25em;
+    border-radius: 0.25em;
+}
+
+.msg > .date {
+    text-align: center;
+    font-size: 70%;
+}
+
+.msg > time {
+    margin-left: 0.5em;
+    display: inline-block;
+    font-size: 60%;
+}
+
+.msg.sent {
+    margin-left: auto;
+    margin-right: 0;
+    text-align: right;
+}
+
+.msg.sent > .message {
+    background: #99f;
+    text-align: left;
+}
+
+.msg.sent > time {
+    margin-left: 0;
+    margin-right: 0.5em;
+}
+
+.msg.notice > .notice {
+    font-size: 70%;
+    font-weight: bold;
+    color: #888;
+}
+
+.msg:first-child {
     margin-top: auto;
 }
 

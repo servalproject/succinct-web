@@ -180,7 +180,7 @@ function team_ui(id) {
     } else {
         var chat = team.chats[team.chats.length-1];
         var lastmsg = node.find('.lastmsg');
-        lastmsg.find('time').attr('datetime', chat.time.toISOString()).attr('title', chat.time.toLocaleString()).text(elapsed(chat.time));
+        lastmsg.find('time').attr('datetime', chat.time.toISOString()).attr('title', chat.time.toString()).text(elapsed(chat.time));
         var sender;
         console.log(chat);
         if (chat.member) {
@@ -221,6 +221,7 @@ function team_ui(id) {
         }
     }
     var pos = teamorder.indexOf(id);
+    node.click(function() { show_chat(id); });
     if (pos < 0) {
         console.error('id not found in teamorder');
     } else if (pos == 0) {
@@ -228,6 +229,122 @@ function team_ui(id) {
     } else {
         node.insertAfter('#team-'+teamorder[pos-1]);
     }
+}
+
+function show_chat(id) {
+    var team = teams[id];
+    var chatbox = $('#chat');
+    chatbox.find('.card-header').text(team.name);
+    chatbox.find('#members li').not('.template').remove();
+    for (var i=0; i<team.members.length; i++) {
+        var member = team.members[i];
+        if (team.finished === null && member.parted !== null) {
+            // only show active members of active team
+            // todo: maybe present parted members separately?
+            continue;
+        }
+        var li = chatbox.find('#member-template').clone().removeClass('template').attr('id', 'member-'+member.member_id);
+        if (member.member_id == 1) {
+            li.addClass('leader');
+        }
+        li.text(member.name);
+        li.data('id', member.member_id);
+        li.insertBefore('#member-template');
+    }
+    chatbox.find('#chatlog > div').not('.template').remove();
+    var lastdate = '';
+    for (var i=0; i<team.chats.length; i++) {
+        var chat = team.chats[i];
+        var node;
+        if (chat.type == Chat.TYPE_MESSAGE) {
+            if (chat.sender === 0) {
+                node = chatbox.find('#msg-sent-template').clone();
+            } else {
+                node = chatbox.find('#msg-template').clone();
+            }
+        } else {
+            node = chatbox.find('#msg-notice-template').clone();
+        }
+        node.removeClass('template').attr('id', 'chat-'+id+'-'+chat.id);
+        fill_chat_template(node, chat, id);
+        var chatdate = chat.time.toDateString();
+        if (chatdate != lastdate) {
+            node.find('div.date').show();
+            lastdate = chatdate;
+        }
+        if (i == 0) {
+            node.prependTo('#chatlog');
+        } else {
+            node.insertAfter('#chat-'+id+'-'+team.chats[i-1].id);
+        }
+    }
+    chatbox.show();
+}
+
+function fill_chat_template(node, chat, tid) {
+    var sender;
+    var cls;
+    var notice;
+
+    if (chat.member) {
+        sender = chat.member.name;
+    } else if (chat.sender === 0) {
+        sender = 'EOC';
+    } else {
+        sender = chat.sender;
+    }
+
+    switch (chat.type) {
+        case Chat.TYPE_MESSAGE:
+            cls = 'chat-message';
+            break;
+        case Chat.TYPE_JOIN:
+            cls = 'chat-join';
+            notice = sender + ' joined the team';
+            break;
+        case Chat.TYPE_PART:
+            cls = 'chat-part';
+            notice = sender + ' left the team';
+            break;
+        case Chat.TYPE_START:
+            cls = 'chat-start';
+            notice = 'Team started';
+            break;
+        case Chat.TYPE_FINISH:
+            cls = 'chat-finish';
+            notice = 'Team finished';
+            break;
+        default:
+            console.error('Unexpected chat message type', chat.type);
+            return;
+    }
+
+    if (notice) {
+        node.find('.notice').text(notice).show();
+        node.find('.sender').hide();
+        node.find('.message').hide();
+    } else {
+        node.find('.notice').hide();
+        node.find('.sender').text(sender).show();
+        node.find('.message').text(chat.message).show();
+    }
+
+    var timenodes = node.find('time.abbreviated');
+    if (timenodes.length) {
+        timenodes.attr('datetime', chat.time.toISOString()).attr('title', chat.time.toString()).text(elapsed(chat.time));
+    }
+    timenodes = node.find('time.date');
+    if (timenodes.length) {
+        var d = new Date(chat.time);
+        d.setHours(0,0,0,0);
+        timenodes.attr('datetime', d.toISOString()).attr('title', null).text(fulldate(d));
+    }
+    timenodes = node.find('time.time');
+    if (timenodes.length) {
+        timenodes.attr('datetime', chat.time.toISOString()).attr('title', chat.time.toString()).text(shorttime(chat.time));
+    }
+
+    node.addClass(cls);
 }
 
 function cmp_chat(a, b) {
@@ -416,6 +533,11 @@ function insert_sorted(a, item, cmp, tryfirst) {
     return low;
 }
 
+var Date_days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+var Date_months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul',' Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+var Date_showampm = /(am|pm)/.test(new Date().toLocaleTimeString());
+var Date_showAMPM = /(AM|PM)/.test(new Date().toLocaleTimeString());
+
 function elapsed(date) {
     var duration = (Date.now() - date.getTime())/1000;
     if (duration < 90) {
@@ -425,10 +547,38 @@ function elapsed(date) {
     } else if (duration < 23*3600) {
         return Math.round(duration/3600)+' hr';
     } else if (duration < 7*24*3600) {
-        var days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        return days[date.getDay()];
+        return Date_days[date.getDay()];
+    } else if (duration < 300*24*3600) {
+        return date.getDate()+' '+Date_months[date.getMonth()];
     } else {
-        var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul',' Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return date.getDate()+' '+months[date.getMonth()];
+        return date.getDate()+' '+Date_months[date.getMonth()]+' '+date.getFullYear();
+    }
+}
+
+function fulldate(date) {
+    // FIXME Date.toLocaleDateString() should work but seemingly does not work properly on Firefox
+    return Date_days[date.getDay()]+' '+date.getDate()+' '+Date_months[date.getMonth()]+' '+date.getFullYear();
+}
+
+function shorttime(date) {
+    // FIXME Date.toLocaleTimeString() should work with appropriate options but is not well supported
+    var hour = date.getHours();
+    var min = date.getMinutes();
+    var pm = false;
+    if (Date_showampm || Date_showAMPM) {
+        if (hour >= 12) {
+            hour -= 12;
+            pm = true;
+        }
+        if (hour == 0) hour = 12;
+    }
+    if (hour < 10) hour = '0' + hour;
+    if (min < 10) min = '0' + min;
+    if (Date_showampm) {
+        return hour + ':' + min + ' ' + (pm ? 'pm' : 'am');
+    } else if (Date_showAMPM) {
+        return hour + ':' + min + ' ' + (pm ? 'PM' : 'AM');
+    } else {
+        return hour + ':' + min;
     }
 }

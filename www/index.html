@@ -32,15 +32,37 @@
                             <h6 class="teamname">Team Name<br>
                                 <div class="teammembers">Team Leader, Team Member 2, Team Member 3</div>
                             </h6>
-                            <div class="lastmsg"><time title="Thu Jan 1 1970 00:00:00" datetime="1970-01-01T00:00:00.000Z">now</time><span class="sender">Team Leader</span><span class="message">Last message lorem ipsum etc etc</span></div>
+                            <div class="lastmsg"><time title="Thu Jan 1 1970 00:00:00" datetime="1970-01-01T00:00:00.000Z" class="abbreviated">now</time><span class="notice"></span><span class="sender">Team Leader</span><span class="message">Last message lorem ipsum etc etc</span></div>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="sidebar flex flex-col" style="display: none" id="chat">
                 <div class="card-header">Team name</div>
-                <div class="flex-inflexible" id="memberlist"><ul class="list-group" id="members"><li class="list-group-item template">Member Name</li></ul></div>
-                <div class="flex-flexible flex flex-col" id="chatlog"><div>Chat log</div></div>
+                <div class="flex-inflexible" id="memberlist"><ul class="list-group" id="members"><li class="list-group-item template" id="member-template">Member Name</li></ul></div>
+                <div class="flex-flexible flex flex-col" id="chatlog">
+                    <div class="msg sent template" id="msg-sent-template">
+                        <div class="date" style="display: none;">
+                            <hr>
+                            <time class="date" datetime="1970-01-01T00:00:00.000Z">1 January 1970</time>
+                        </div>
+                        <span class="sender">Sender</span><time class="time" title="Thu Jan 1 1970 00:00:00" datetime="1970-01-01T00:00:00.000Z">12:00 AM</time><span class="message">Message</span>
+                    </div>
+                    <div class="msg template" id="msg-template">
+                        <div class="date" style="display: none;">
+                            <hr>
+                            <time class="date" datetime="1970-01-01T00:00:00.000Z">1 January 1970</time>
+                        </div>
+                        <span class="sender">Sender</span><span class="message">Message</span><time class="time" title="Thu Jan 1 1970 00:00:00" datetime="1970-01-01T00:00:00.000Z">12:00 AM</time>
+                    </div>
+                    <div class="msg notice template" id="msg-notice-template">
+                        <div class="date" style="display: none;">
+                            <hr>
+                            <time class="date" datetime="1970-01-01T00:00:00.000Z">1 January 1970</time>
+                        </div>
+                        <span class="notice">Notice</span><time class="time" title="Thu Jan 1 1970 00:00:00" datetime="1970-01-01T00:00:00.000Z">12:00 AM</time>
+                    </div>
+                </div>
                 <div class="flex-inflexible flex" id="msginput"><input class="form-control flex-flexible" type="text" id="msg"><button id="send" type="submit" class="btn btn-primary">Send</div>
             </div>
             <div id="map"></div>
