@@ -51,14 +51,6 @@ function authenticate() {
     });
 }
 
-function get_older_chats(tid) {
-    if (!tid || !teams[tid]) return;
-    if (typeof teams[tid].chatlinks.older != 'object') return;
-    if (teams[tid].loading) return;
-    teams[tid].loading = true;
-    console.log('load more chats ...', tid);
-}
-
 function new_teams(t) {
     var now = new Date();
     var firstpush = false;
@@ -133,6 +125,8 @@ function new_chat(tid, chat) {
     console.log('new chat', tid, chat);
 
     append_sorted(teams[tid].chats, chat, cmp_chat, true);
+
+    // todo update UI if necessary
 }
 
 function new_member(tid, member) {
@@ -151,6 +145,8 @@ function new_member(tid, member) {
     if (member.parted) {
         new_chat(tid, {type: Chat.TYPE_PART, time: new Date(member.parted), sender: member.member_id, id: 'part-'+member.member_id});
     }
+
+    // todo update UI if necessary
 }
 
 function team_update_order(id) {
@@ -297,6 +293,7 @@ function show_chat(id) {
             node.find('div.date').show();
             lastdate = chatdate;
         }
+        console.log(node, lastid);
         if (lastid === null) {
             node.prependTo(chatlog);
         } else {
@@ -394,7 +391,35 @@ function check_chat_loader() {
     if (!element_in_view(spinner[0])) {
         return;
     }
-    get_older_chats(chatbox.data('teamid'));
+    get_older_chats(parseInt(chatbox.data('teamid')));
+}
+
+function get_older_chats(tid) {
+    if (!tid || !teams[tid]) return;
+    if (typeof teams[tid].chatlinks.older != 'object') return;
+    if (teams[tid].loading) return;
+    teams[tid].loading = true;
+    get(socket, teams[tid].chatlinks.older[0], teams[tid].chatlinks.older[1], function (s,d) {new_chat_data(s, d, tid);});
+    console.log('loading more chats', tid, teams[tid].chatlinks.older[0], teams[tid].chatlinks.older[1]);
+}
+
+function new_chat_data(s, chats, tid) {
+    if (s != 'ok') {
+        console.error('get new chat data', s, chats);
+        // todo show error message or try again?
+        return;
+    }
+    console.log('new chat data', chats);
+    if (chats.links) {
+        teams[tid].chatlinks = chats.links;
+    }
+    for (var i=0; i<chats.data.length; i++) {
+        var chat = chats.data[i];
+        chat.type = Chat.TYPE_MESSAGE;
+        new_chat(tid, chat);
+    }
+    // let DOM settle before being able to load more content
+    setTimeout(function () { teams[tid].loading = false; check_chat_loader(); }, 500);
 }
 
 function cmp_chat(a, b) {
