@@ -234,6 +234,10 @@ function team_ui(id) {
 function show_chat(id) {
     var team = teams[id];
     var chatbox = $('#chat');
+    if (chatbox.data('teamid') == ''+id) {
+        console.log('already showing team', id);
+        return;
+    }
     chatbox.find('.card-header').text(team.name);
     chatbox.find('#members li').not('.template').remove();
     for (var i=0; i<team.members.length; i++) {
@@ -278,6 +282,7 @@ function show_chat(id) {
             node.insertAfter('#chat-'+id+'-'+team.chats[i-1].id);
         }
     }
+    chatbox.data('teamid', ''+id);
     chatbox.show();
 }
 
