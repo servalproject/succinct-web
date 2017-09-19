@@ -174,7 +174,12 @@ body {
     color: #888;
 }
 
-.msg:first-child {
+#chatlog > div.spinner {
+    padding: 1em;
+    text-align: center;
+}
+
+#chatlog > div:first-child {
     margin-top: auto;
 }
 

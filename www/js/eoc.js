@@ -8,6 +8,7 @@ var marker = L.marker([-34.9, 138.6]).addTo(map);
 var teams = {};
 var teamorder = [];
 var teamlinks = null;
+var chatlog_onscroll_installed = false;
 
 var Chat = function () {};
 Chat.TYPE_MESSAGE = 0;
@@ -48,6 +49,14 @@ function authenticate() {
             return;
         }
     });
+}
+
+function get_older_chats(tid) {
+    if (!tid || !teams[tid]) return;
+    if (typeof teams[tid].chatlinks.older != 'object') return;
+    if (teams[tid].loading) return;
+    teams[tid].loading = true;
+    console.log('load more chats ...', tid);
 }
 
 function new_teams(t) {
@@ -233,6 +242,7 @@ function team_ui(id) {
 
 function show_chat(id) {
     var team = teams[id];
+    var haveall = (typeof team.chatlinks.older == 'undefined');
     var chatbox = $('#chat');
     if (chatbox.data('teamid') == ''+id) {
         console.log('already showing team', id);
@@ -255,10 +265,20 @@ function show_chat(id) {
         li.data('id', member.member_id);
         li.insertBefore('#member-template');
     }
-    chatbox.find('#chatlog > div').not('.template').remove();
+    chatbox.find('#chatlog > div.msg').not('.template').remove();
+    var spinner = chatbox.find('#chatlog > div.spinner');
+    spinner.hide().appendTo('#chatlog');
+
+    var shownotices = haveall;
     var lastdate = '';
+    var lastid = null;
     for (var i=0; i<team.chats.length; i++) {
         var chat = team.chats[i];
+        if (chat.type == Chat.TYPE_MESSAGE) {
+            shownotices = true;
+        } else if (!shownotices) {
+            continue;
+        }
         var node;
         if (chat.type == Chat.TYPE_MESSAGE) {
             if (chat.sender === 0) {
@@ -276,14 +296,26 @@ function show_chat(id) {
             node.find('div.date').show();
             lastdate = chatdate;
         }
-        if (i == 0) {
+        if (lastid === null) {
             node.prependTo('#chatlog');
         } else {
-            node.insertAfter('#chat-'+id+'-'+team.chats[i-1].id);
+            node.insertAfter('#chat-'+id+'-'+lastid);
         }
+        lastid = id;
     }
+
+    if (!haveall) {
+        spinner.prependTo('#chatlog').show();
+        if (!chatlog_onscroll_installed) {
+            chatbox.find('#chatlog').scroll(check_chat_loader);
+            chatlog_onscroll_installed = true;
+        }
+        setTimeout(check_chat_loader, 500);
+    }
+
     chatbox.data('teamid', ''+id);
     chatbox.show();
+    chatbox.find('#chatlog').scrollTop(chatbox.find('#chatlog').prop('scrollHeight'));
 }
 
 function fill_chat_template(node, chat, tid) {
@@ -350,6 +382,18 @@ function fill_chat_template(node, chat, tid) {
     }
 
     node.addClass(cls);
+}
+
+function check_chat_loader() {
+    var chatbox = $('#chat');
+    if (!chatbox.is(':visible')) {
+        return;
+    }
+    var spinner = chatbox.find('#chatlog > div.spinner');
+    if (!element_in_view(spinner[0])) {
+        return;
+    }
+    get_older_chats(chatbox.data('teamid'));
 }
 
 function cmp_chat(a, b) {
@@ -586,4 +630,19 @@ function shorttime(date) {
     } else {
         return hour + ':' + min;
     }
+}
+
+function element_in_view(el) {
+    var rect = el.getBoundingClientRect();
+    var top = rect.top;
+    var height = rect.height;
+    do {
+        el = el.parentNode;
+        rect = el.getBoundingClientRect();
+        if (top > rect.bottom) return false;
+        // check if the element is out of view due to a container scrolling
+        if ((top + height) <= rect.top) return false;
+    } while (el.parentNode != document.body);
+    // Check its within the document viewport
+    return top <= document.documentElement.clientHeight;
 }
