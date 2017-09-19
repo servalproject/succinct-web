@@ -267,7 +267,8 @@ function show_chat(id) {
     }
     chatbox.find('#chatlog > div.msg').not('.template').remove();
     var spinner = chatbox.find('#chatlog > div.spinner');
-    spinner.hide().appendTo('#chatlog');
+    var chatlog = chatbox.find('#chatlog');
+    spinner.hide().appendTo(chatlog);
 
     var shownotices = haveall;
     var lastdate = '';
@@ -282,12 +283,12 @@ function show_chat(id) {
         var node;
         if (chat.type == Chat.TYPE_MESSAGE) {
             if (chat.sender === 0) {
-                node = chatbox.find('#msg-sent-template').clone();
+                node = chatlog.find('#msg-sent-template').clone();
             } else {
-                node = chatbox.find('#msg-template').clone();
+                node = chatlog.find('#msg-template').clone();
             }
         } else {
-            node = chatbox.find('#msg-notice-template').clone();
+            node = chatlog.find('#msg-notice-template').clone();
         }
         node.removeClass('template').attr('id', 'chat-'+id+'-'+chat.id);
         fill_chat_template(node, chat, id);
@@ -297,17 +298,17 @@ function show_chat(id) {
             lastdate = chatdate;
         }
         if (lastid === null) {
-            node.prependTo('#chatlog');
+            node.prependTo(chatlog);
         } else {
             node.insertAfter('#chat-'+id+'-'+lastid);
         }
-        lastid = id;
+        lastid = chat.id;
     }
 
     if (!haveall) {
-        spinner.prependTo('#chatlog').show();
+        spinner.prependTo(chatlog).show();
         if (!chatlog_onscroll_installed) {
-            chatbox.find('#chatlog').scroll(check_chat_loader);
+            chatlog.scroll(check_chat_loader);
             chatlog_onscroll_installed = true;
         }
         setTimeout(check_chat_loader, 500);
@@ -315,7 +316,7 @@ function show_chat(id) {
 
     chatbox.data('teamid', ''+id);
     chatbox.show();
-    chatbox.find('#chatlog').scrollTop(chatbox.find('#chatlog').prop('scrollHeight'));
+    chatlog.scrollTop(chatlog.prop('scrollHeight'));
 }
 
 function fill_chat_template(node, chat, tid) {
