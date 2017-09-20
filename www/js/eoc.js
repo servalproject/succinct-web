@@ -1,5 +1,37 @@
-// ensure Array.isArray is implemented
+// polyfills
 if (!Array.isArray) { Array.isArray = function(arg) { return Object.prototype.toString.call(arg) === '[object Array]'; }; }
+if (!Array.prototype.find) {
+    Object.defineProperty(Array.prototype, 'find', {
+        value: function(predicate) {
+            if (this == null) throw new TypeError('"this" is null or not defined');
+            var o = Object(this);
+            var len = o.length >>> 0;
+            if (typeof predicate !== 'function') throw new TypeError('predicate must be a function');
+            var thisArg = arguments[1];
+            for (var k=0; k < len; k++) {
+                var kValue = o[k];
+                if (predicate.call(thisArg, kValue, k, o)) return kValue;
+            }
+            return undefined;
+        }
+    });
+}
+if (!Array.prototype.findIndex) {
+    Object.defineProperty(Array.prototype, 'findIndex', {
+        value: function(predicate) {
+            if (this == null) throw new TypeError('"this" is null or not defined');
+            var o = Object(this);
+            var len = o.length >>> 0;
+            if (typeof predicate !== 'function') throw new TypeError('predicate must be a function');
+            var thisArg = arguments[1];
+            for (var k=0; k < len; k++) {
+                var kValue = o[k];
+                if (predicate.call(thisArg, kValue, k, o)) return k;
+            }
+            return -1;
+        }
+    });
+}
 
 var map = L.map('map', {attributionControl: false}).setView([-34.929, 138.601], 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -124,9 +156,9 @@ function new_chat(tid, chat) {
 
     console.log('new chat', tid, chat);
 
-    append_sorted(teams[tid].chats, chat, cmp_chat, true);
+    var pos = append_sorted(teams[tid].chats, chat, cmp_chat, true);
 
-    // todo update UI if necessary
+    return pos;
 }
 
 function new_member(tid, member) {
@@ -187,7 +219,6 @@ function team_ui(id) {
         var lastmsg = node.find('.lastmsg');
         lastmsg.find('time').attr('datetime', chat.time.toISOString()).attr('title', chat.time.toString()).text(elapsed(chat.time));
         var sender;
-        console.log(chat);
         if (chat.member) {
             sender = chat.member.name;
         } else if (chat.sender === 0) {
@@ -241,6 +272,7 @@ function show_chat(id) {
     var haveall = (typeof team.chatlinks.older == 'undefined');
     var chatbox = $('#chat');
     if (chatbox.data('teamid') == ''+id) {
+        chatbox.show();
         console.log('already showing team', id);
         return;
     }
@@ -264,10 +296,9 @@ function show_chat(id) {
     chatbox.find('#chatlog > div.msg').not('.template').remove();
     var spinner = chatbox.find('#chatlog > div.spinner');
     var chatlog = chatbox.find('#chatlog');
-    spinner.hide().appendTo(chatlog);
+    spinner.hide();
 
     var shownotices = haveall;
-    var lastdate = '';
     var lastid = null;
     for (var i=0; i<team.chats.length; i++) {
         var chat = team.chats[i];
@@ -276,34 +307,12 @@ function show_chat(id) {
         } else if (!shownotices) {
             continue;
         }
-        var node;
-        if (chat.type == Chat.TYPE_MESSAGE) {
-            if (chat.sender === 0) {
-                node = chatlog.find('#msg-sent-template').clone();
-            } else {
-                node = chatlog.find('#msg-template').clone();
-            }
-        } else {
-            node = chatlog.find('#msg-notice-template').clone();
-        }
-        node.removeClass('template').attr('id', 'chat-'+id+'-'+chat.id);
-        fill_chat_template(node, chat, id);
-        var chatdate = chat.time.toDateString();
-        if (chatdate != lastdate) {
-            node.find('div.date').show();
-            lastdate = chatdate;
-        }
-        console.log(node, lastid);
-        if (lastid === null) {
-            node.prependTo(chatlog);
-        } else {
-            node.insertAfter('#chat-'+id+'-'+lastid);
-        }
+        insert_chat_node(chat, id, lastid);
         lastid = chat.id;
     }
 
     if (!haveall) {
-        spinner.prependTo(chatlog).show();
+        spinner.show();
         if (!chatlog_onscroll_installed) {
             chatlog.scroll(check_chat_loader);
             chatlog_onscroll_installed = true;
@@ -313,7 +322,46 @@ function show_chat(id) {
 
     chatbox.data('teamid', ''+id);
     chatbox.show();
-    chatlog.scrollTop(chatlog.prop('scrollHeight'));
+    scroll_to_bottom(chatlog);
+}
+
+function insert_chat_node(chat, tid, lastid) {
+    var chatlog = $('#chatlog');
+    var node;
+    if (chat.type == Chat.TYPE_MESSAGE) {
+        if (chat.sender === 0) {
+            node = chatlog.find('#msg-sent-template').clone();
+        } else {
+            node = chatlog.find('#msg-template').clone();
+        }
+    } else {
+        node = chatlog.find('#msg-notice-template').clone();
+    }
+    node.removeClass('template').attr('id', 'chat-'+tid+'-'+chat.id);
+    fill_chat_template(node, chat, tid);
+    var prevdate = '';
+    if (lastid !== null) {
+        var prevnode = $('#chat-'+tid+'-'+lastid);
+        if (prevnode.length == 0) {
+            lastid = null;
+        } else {
+            prevdate = prevnode.find('div.date').text();
+        }
+    }
+    var chatdate = node.find('div.date').text();
+    if (chatdate != prevdate) {
+        node.find('div.date').show();
+        prevdate = chatdate;
+    }
+    if (lastid === null) {
+        node.insertAfter(chatlog.find('div.spinner'));
+    } else {
+        node.insertAfter('#chat-'+tid+'-'+lastid);
+    }
+    var next = node.next();
+    if (!next.hasClass('template') && chatdate == next.find('div.date').text()) {
+        next.find('div.date').hide();
+    }
 }
 
 function fill_chat_template(node, chat, tid) {
@@ -399,26 +447,84 @@ function get_older_chats(tid) {
     if (typeof teams[tid].chatlinks.older != 'object') return;
     if (teams[tid].loading) return;
     teams[tid].loading = true;
-    get(socket, teams[tid].chatlinks.older[0], teams[tid].chatlinks.older[1], function (s,d) {new_chat_data(s, d, tid);});
+    get(socket, teams[tid].chatlinks.older[0], teams[tid].chatlinks.older[1], function (s,d) {new_chat_messages(s, d, tid);});
     console.log('loading more chats', tid, teams[tid].chatlinks.older[0], teams[tid].chatlinks.older[1]);
 }
 
-function new_chat_data(s, chats, tid) {
+function new_chat_messages(s, chats, tid) {
     if (s != 'ok') {
         console.error('get new chat data', s, chats);
         // todo show error message or try again?
         return;
     }
-    console.log('new chat data', chats);
+
+    var hadall = (typeof teams[tid].chatlinks.older == 'undefined');
+
+    var first_shown = -1;
+    if (hadall && teams[tid].chats.length > 0) {
+        first_shown = 0;
+    } else {
+        first_shown = teams[tid].chats.findIndex(function (c) { return c.type == Chat.TYPE_MESSAGE; });
+    }
+
     if (chats.links) {
         teams[tid].chatlinks = chats.links;
     }
+
+    // data set changes
+
+    var inserted = [];
     for (var i=0; i<chats.data.length; i++) {
         var chat = chats.data[i];
         chat.type = Chat.TYPE_MESSAGE;
-        new_chat(tid, chat);
+        var pos = new_chat(tid, chat);
+
+        if (first_shown >= 0 && pos <= first_shown) first_shown++;
+        for (var j=0; j<inserted.length; j++) {
+            if (pos <= inserted[j]) inserted[j]++;
+        }
+        inserted.push(pos);
     }
+
+    // UI changes
+
+    var chatbox = $('#chat');
+    if (chatbox.data('teamid') != ''+tid) {
+        return;
+    }
+
+    var haveall = (typeof teams[tid].chatlinks.older == 'undefined');
+
+    if (haveall && !hadall) {
+        $('#chatlog > div.spinner').hide();
+    }
+
+    var chatlog = chatbox.find('#chatlog');
+    var atbottom = is_scrolled_to_bottom(chatlog);
+
+    if (!teams[tid].chats.length) return;
+
+    inserted.sort(function (a,b) {return a-b;});
+
+    var start = (haveall || inserted.length == 0) ? 0 : inserted[0];
+    if (first_shown < 0) first_shown = teams[tid].chats.length;
+
+    for (var i=start; i<first_shown; i++) {
+        var prev = (i == 0 ? null : teams[tid].chats[i-1].id);
+        insert_chat_node(teams[tid].chats[i], tid, prev);
+    }
+
+    for (var i=0; i<inserted.length; i++) {
+        var pos = inserted[i];
+        if (pos < first_shown) continue;
+        var prev = (pos == 0 ? null : teams[tid].chats[pos-1].id);
+        insert_chat_node(teams[tid].chats[pos], tid, prev);
+    }
+
     // let DOM settle before being able to load more content
+    if (atbottom) {
+        setTimeout(function () {scroll_to_bottom(chatlog);}, 50);
+    }
     setTimeout(function () { teams[tid].loading = false; check_chat_loader(); }, 500);
 }
 
@@ -671,4 +777,12 @@ function element_in_view(el) {
     } while (el.parentNode != document.body);
     // Check its within the document viewport
     return top <= document.documentElement.clientHeight;
+}
+
+function scroll_to_bottom(jq) {
+    jq.scrollTop(jq.prop('scrollHeight'));
+}
+
+function is_scrolled_to_bottom(jq) {
+    return (jq.prop('scrollHeight')-jq.scrollTop() == jq.prop('clientHeight'));
 }
