@@ -33,9 +33,9 @@ if (!Array.prototype.findIndex) {
     });
 }
 
+// todo choose map centre more cleverly
 var map = L.map('map', {attributionControl: false}).setView([-34.929, 138.601], 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-var marker = L.marker([-34.9, 138.6]).addTo(map);
 
 var teams = {};
 var teamorder = [];
@@ -97,7 +97,7 @@ function new_teams(t) {
         var newteam = false;
         if (!teams[id]) {
             newteam = true;
-            teams[id] = {chats: [], members: [], chatlinks: null};
+            teams[id] = {chats: [], members: [], chatlinks: null, layergroup: L.layerGroup().addTo(map)};
         }
         console.log(team);
         for (var key in team) {
@@ -163,6 +163,7 @@ function new_chat(tid, chat) {
 
 function new_member(tid, member) {
     member = $.extend({}, member);
+    var member_id = member.member_id;
     if (member.joined) member.joined = new Date(member.joined);
     if (member.parted) member.parted = new Date(member.parted);
     if (member.time)   member.time   = new Date(member.time);
@@ -179,6 +180,18 @@ function new_member(tid, member) {
     }
 
     // todo update UI if necessary
+
+    if (member.time && member.parted === null) {
+        // have location and should show on map
+        member.marker = L.marker([member.lat, member.lng]);
+        var tooltip = function () {
+            var timehtml = '<time class="abbreviated" datetime="'+member.time.toISOString()+'">' + elapsed(member.time) + '</time>';
+            return member.name + ' (<b>' + teams[tid].name + '</b>, ' + timehtml +  ')';
+        };
+        member.marker.bindTooltip(tooltip);
+        member.marker.on('click', function() { show_chat(tid, member_id); });
+        member.marker.addTo(teams[tid].layergroup);
+    }
 }
 
 function team_update_order(id) {
@@ -267,7 +280,7 @@ function team_ui(id) {
     }
 }
 
-function show_chat(id) {
+function show_chat(id, memberid) {
     var team = teams[id];
     var haveall = (typeof team.chatlinks.older == 'undefined');
     var chatbox = $('#chat');
