@@ -101,3 +101,14 @@ char *format_seq(int64_t seq) {
     sprintf(s, "%010"PRIu32, (uint32_t) seq);
     return s;
 }
+
+int64_t parse_seq(const char *seq) {
+    if (seq == NULL || *seq == '\0') return -1;
+    char *end = NULL;
+    long long int s = strtoll(seq, &end, 10);
+    if (s < 0 || s > UINT32_MAX || *end != '\0') {
+        warn("%s: invalid sequence number (%s)", seq, __func__);
+        return -1;
+    }
+    return s;
+}

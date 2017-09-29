@@ -24,4 +24,7 @@ long fragment_file_first_message_offset(FILE *fragment);
 /* NULL on error, should be free'd after use. Padded on left with 0s. */
 char *format_seq(int64_t seq);
 
+/* negative on invalid sequence, uint32_t value on success */
+int64_t parse_seq(const char *seq);
+
 #endif /* !FRAGMENT_H */
