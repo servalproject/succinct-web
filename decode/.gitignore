@@ -1,4 +1,5 @@
 /place_fragment
 /fraginfo
 /fragextract
+/fragwrite
 /*.o
