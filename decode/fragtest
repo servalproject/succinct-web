@@ -1,0 +1,97 @@
+#!/bin/bash
+
+MESSAGES=100
+
+mkdir test || { echo "test: directory already exists"; exit 1; }
+
+mkdir test/original
+mkdir test/fragments
+
+function randu32 { echo `od -vAn -N4 -tu4 /dev/urandom`; }
+function randu16 { echo `od -vAn -N2 -tu2 /dev/urandom`; }
+function randu8 { echo `od -vAn -N1 -tu1 /dev/urandom`; }
+function randu4 { echo $(($(randu8)%16)); }
+function randu3 { echo $(($(randu8)%8)); }
+function randu2 { echo $(($(randu8)%4)); }
+function randu1 { echo $(($(randu8)%2)); }
+
+teamid=$(printf '%08x%08x' $(randu32) $(randu32))
+
+for ((i=0; i<MESSAGES; i++)); do
+    rand=$(randu4)
+    if ((rand==0)); then
+        payloadsize=0
+    elif ((rand==1)); then
+        payloadsize=65535
+    elif ((rand<4)); then
+        payloadsize=$(randu16)
+    else
+        payloadsize=$(randu8)
+    fi
+    msgtype=$(randu8)
+    rand=$(randu4)
+    if ((payloadsize<50 && rand==0)); then
+        mtu=14
+    elif ((rand<4)); then
+        mtu=$((250+$(randu16)))
+        if ((mtu>65535)); then
+            mtu=65535
+        fi
+    elif ((payloadsize>10000)); then
+        mtu=1000
+    else
+        mtu=250
+    fi
+    msgfile=$(printf '%07d' $i)
+    echo "Generating message $msgfile: type=$msgtype length=$payloadsize mtu=$mtu"
+    printf '\x'$(printf '%02x' $msgtype) > test/original/$msgfile
+    printf '\x'$(printf '%02x' $((payloadsize>>8))) >> test/original/$msgfile
+    printf '\x'$(printf '%02x' $((payloadsize&0xff))) >> test/original/$msgfile
+    if ((payloadsize>0)); then
+        dd if=/dev/urandom status=none bs=$payloadsize count=1 >> test/original/$msgfile
+        dd if=test/original/$msgfile status=none skip=3 iflag=skip_bytes bs=$payloadsize count=1 \
+            | ./fragwrite test/fragments $teamid 0 $mtu $msgtype /dev/stdin
+    else
+        ./fragwrite test/fragments $teamid 0 $mtu $msgtype /dev/null
+    fi
+done
+
+numfragments=$(find test/fragments -type f | wc -l)
+
+echo "fragtest: checking for message starts"
+starts=$(find test/fragments -type f -exec ./fraginfo msgstarts {} \; | awk '{s+=$0} END{print s}')
+
+if ((starts==MESSAGES)); then
+    echo "OK: fragments contain all $MESSAGES starts"
+else
+    echo "FAIL: fragments only contain $starts starts out of $MESSAGES"
+    exit 1
+fi
+
+orighash=$(sha1sum test/original/* | awk '{print $1}' | sha1sum | awk '{print $1}')
+
+mkdir test/placed
+
+while read frag; do
+    ./place_fragment $frag test/placed
+    ./rebuild_messages test/placed $teamid $(basename $frag)
+done < <(find test/fragments -type f | shuf)
+
+rebuilthash=$(sha1sum test/placed/$teamid/messages/new/* | awk '{print $1}' | sha1sum | awk '{print $1}')
+
+if [[ $rebuilthash = $orighash ]]; then
+    echo "OK: all $MESSAGES messages rebuilt successfully"
+else
+    echo "FAIL: not all messages rebuilt successfully"
+    exit 1
+fi
+
+remaining=$(find test/placed/$teamid/fragments/{partial,new} -type f | wc -l)
+numdone=$(find test/placed/$teamid/fragments/done -type f | wc -l)
+
+if ((remaining==0 && numfragments==numdone)); then
+    echo "OK: all $numfragments fragment files in done folder"
+else
+    echo "FAIL: not all $numfragments fragment files in done folder"
+    exit 1
+fi
