@@ -46,7 +46,8 @@ fi
 function fragment_is_continuation {
     local team="$1"
     local seq="$2"
-    local offset=$("$FRAGINFO" rawoffset "$team/fragments/partial/$seq")
+    local offset
+    offset=$("$FRAGINFO" rawoffset "$team/fragments/partial/$seq")
     [ $? -eq 0 ] || error_exit "could not read offset of fragment $team/$seq"
     return $((offset==0))
 }
@@ -54,7 +55,8 @@ function fragment_is_continuation {
 function fragment_msg_starts {
     local team="$1"
     local seq="$2"
-    local starts=$("$FRAGINFO" msgstarts "$team/fragments/partial/$seq")
+    local starts
+    starts=$("$FRAGINFO" msgstarts "$team/fragments/partial/$seq")
     [ $? -eq 0 ] || error_exit "could not count message starts of fragment $team/$seq"
     echo $starts
     return 0
@@ -87,7 +89,8 @@ function check_done {
         fi
     fi
 
-    local starts=$(fragment_msg_starts $team $seq)
+    local starts
+    starts=$(fragment_msg_starts $team $seq)
     [ $? -eq 0 ] || exit 1
 
     local last_message_done
@@ -139,7 +142,8 @@ function rebuild_msg {
     mkdir -p "$team/messages/new" || exit 1
     mkdir -p "$team/messages/done" || exit 1
 
-    local tmp=$(mktemp "$team/messages/tmp/$seq.$msgpad.XXXXXX")
+    local tmp
+    tmp=$(mktemp "$team/messages/tmp/$seq.$msgpad.XXXXXX")
     [ $? -eq 0 ] || exit 1
 
     "$FRAGEXTRACT" "$team/fragments/partial" $seq $msg > "$tmp"
