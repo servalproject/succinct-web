@@ -1,0 +1,2 @@
+RewriteEngine on
+RewriteRule ^(v1)/([a-zA-Z0-9]+)(|/(.*))$ index.php?api=$1&cmd=$2&args=$4 [QSA]

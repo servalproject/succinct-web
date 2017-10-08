@@ -37,6 +37,10 @@ cat > /etc/apache2/sites-available/succinct.conf << EOF
         Require all granted
     </Directory>
 
+    <Directory $SUCCINCT_HOME/www/succinct/api>
+        AllowOverride All
+    </Directory>
+
 	ProxyPass "/eoc-ws/" "ws://127.0.0.1:3000/"
 </VirtualHost>
 EOF
