@@ -1,26 +1,73 @@
 #!/bin/bash
 
-((EUID==0)) || { echo "Run this script as root e.g. sudo" "$@"; exit 2; }
+[ -f /sys/hypervisor/uuid ] && [ "$(head -c 3 /sys/hypervisor/uuid)" = "ec2" ] \
+    || { echo "This script is intended to be run on an EC2 instance"; exit 2; }
 
-set -x
+source /etc/os-release || exit 1
+[[ $ID = 'ubuntu' ]] || { echo "This script is intended for EC2 ubuntu instances"; exit 2; }
+
+((EUID==0)) || { echo "Run this script as root e.g. sudo" "$@"; exit 2; }
 
 cd $(dirname "$0")
 
-apt-get install -y apache2
+set -x
 
-a2enmod proxy_wstunnel
-service apache2 restart
+SUCCINCT_HOME=/srv/succinct
+
+apt-get install -y git
+apt-get install -y apache2
+apt-get install -y php7.0 php7.0-cli php7.0-fpm php7.0-curl php7.0-json php7.0-mysql php7.0-mcrypt
+apt-get install -y mariadb-server
 
 curl -sL https://deb.nodesource.com/setup_8.x | bash -
 apt-get install -y nodejs
 
-adduser --system --home /srv/succinct --group succinct
+adduser --system --home $SUCCINCT_HOME --group succinct
 
-cp -a ../www /srv/succinct
-chown -R succinct:succinct /srv/succinct/www
+cat > /etc/apache2/sites-available/succinct.conf << EOF
+<VirtualHost *:80>
+	ServerAdmin webmaster@localhost
+	DocumentRoot $SUCCINCT_HOME/www
+	ErrorLog \${APACHE_LOG_DIR}/succinct-error.log
+	CustomLog \${APACHE_LOG_DIR}/succinct-access.log combined
 
-cp apache/succinct.conf /etc/apache2/sites-available
+    <Directory $SUCCINCT_HOME/www>
+        Options FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
 
+	ProxyPass "/eoc-ws/" "ws://127.0.0.1:3000/"
+</VirtualHost>
+EOF
+
+mkdir $SUCCINCT_HOME/www
+chown succinct:succinct $SUCCINCT_HOME/www
+
+git init --bare $SUCCINCT_HOME/git
+cat > $SUCCINCT_HOME/git/hooks/post-receive << EOF
+#!/bin/bash
+[ -x $SUCCINCT_HOME/setup/post-receive ] && exec sudo -u succinct $SUCCINCT_HOME/setup/post-receive "\$@"
+# fall-back on simple checkout
+while read oldrev newrev ref; do
+    branch=\$(basename "\$ref")
+    [[ \$branch = live ]] || continue
+    sudo -u succinct git --work-tree=$SUCCINCT_HOME --git-dir=$SUCCINCT_HOME/git checkout -f "\$branch"
+done
+EOF
+chmod +x $SUCCINCT_HOME/git/hooks/post-receive
+chown -R ubuntu:ubuntu $SUCCINCT_HOME/git
+
+mkdir -p $SUCCINCT_HOME/spool/tmp
+chown -R succinct:succinct $SUCCINCT_HOME/spool
+
+a2enmod proxy_fcgi
+a2enmod proxy_wstunnel
+a2enconf php7.0-fpm
 a2dissite 000-default
 a2ensite succinct
-service apache2 reload
+
+sed -i 's/user = www-data/user = succinct/' /etc/php/7.0/fpm/pool.d/www.conf
+
+service php7.0-fpm restart
+service apache2 restart
