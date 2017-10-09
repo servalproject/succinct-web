@@ -1,0 +1,32 @@
+#!/bin/bash
+
+LIVE_BRANCH=live
+SUCCINCT_HOME=/srv/succinct
+
+while read oldrev newrev ref; do
+    branch=$(basename "$ref")
+    [[ $branch = "$LIVE_BRANCH" ]] || continue
+
+    git --work-tree=$SUCCINCT_HOME --git-dir=$SUCCINCT_HOME/git checkout -f "$branch"
+
+    if ! [[ $oldrev =~ ^0+$ ]]; then
+        # remove any files deleted between oldrev and newrev
+        while IFS= read -r -d '' deleted; do
+            echo "removing old file $SUCCINCT_HOME/$deleted"
+            rm -f "$SUCCINCT_HOME/$deleted"
+
+            dirname=$(dirname "$deleted")
+            while :; do 
+                [[ $dirname == . ]] && break
+                [ -z "$(find "$SUCCINCT_HOME/$dirname" -maxdepth 0 -type d -empty)" ] && break
+                echo "removing empty directory $SUCCINCT_HOME/$deleted"
+                rmdir "$SUCCINCT_HOME/$dirname" || break
+                dirname=$(dirname "$dirname")
+            done
+        done < <(git --work-tree=$SUCCINCT_HOME --git-dir=$SUCCINCT_HOME/git diff-tree --no-commit-id --name-only --diff-filter=D -z -r "$oldrev..$newrev")
+    fi
+
+    $SUCCINCT_HOME/setup/update-config.sh $SUCCINCT_HOME
+    $SUCCINCT_HOME/setup/dependencies.sh
+    $SUCCINCT_HOME/setup/make.sh
+done
