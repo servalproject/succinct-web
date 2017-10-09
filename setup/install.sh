@@ -13,16 +13,19 @@ cd $(dirname "$0")
 set -x
 
 SUCCINCT_HOME=/srv/succinct
+SSH_USER=ubuntu
 
 apt-get install -y git
 apt-get install -y apache2
 apt-get install -y php7.0 php7.0-cli php7.0-fpm php7.0-curl php7.0-json php7.0-mysql php7.0-mcrypt
 apt-get install -y mariadb-server
+apt-get install -y build-essential
 
 curl -sL https://deb.nodesource.com/setup_8.x | bash -
 apt-get install -y nodejs
 
 adduser --system --home $SUCCINCT_HOME --group succinct
+usermod -a -G succinct $SSH_USER
 
 cat > /etc/apache2/sites-available/succinct.conf << EOF
 <VirtualHost *:80>
@@ -48,22 +51,26 @@ EOF
 mkdir $SUCCINCT_HOME/www
 chown succinct:succinct $SUCCINCT_HOME/www
 
-git init --bare $SUCCINCT_HOME/git
+git init --bare --shared=group $SUCCINCT_HOME/git
 cat > $SUCCINCT_HOME/git/hooks/post-receive << EOF
 #!/bin/bash
-[ -x $SUCCINCT_HOME/setup/post-receive ] && exec sudo -u succinct $SUCCINCT_HOME/setup/post-receive "\$@"
+[ -x $SUCCINCT_HOME/setup/post-receive ] && exec sudo -H -u succinct $SUCCINCT_HOME/setup/post-receive "\$@"
 # fall-back on simple checkout
 while read oldrev newrev ref; do
     branch=\$(basename "\$ref")
     [[ \$branch = live ]] || continue
     sudo -u succinct git --work-tree=$SUCCINCT_HOME --git-dir=$SUCCINCT_HOME/git checkout -f "\$branch"
+    [ -x $SUCCINCT_HOME/setup/post-receive ] && echo "\$oldrev \$newrev \$ref" | sudo -H -u succinct $SUCCINCT_HOME/setup/post-receive "\$@"
 done
 EOF
 chmod +x $SUCCINCT_HOME/git/hooks/post-receive
-chown -R ubuntu:ubuntu $SUCCINCT_HOME/git
+chown -R $SSH_USER:succinct $SUCCINCT_HOME/git
 
 mkdir -p $SUCCINCT_HOME/spool/tmp
 chown -R succinct:succinct $SUCCINCT_HOME/spool
+
+mkdir $SUCCINCT_HOME/log
+chown -R succinct:succinct $SUCCINCT_HOME/log
 
 a2enmod proxy_fcgi
 a2enmod proxy_wstunnel
