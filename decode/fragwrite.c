@@ -90,8 +90,8 @@ int main(int argc, char *argv[]) {
     int rawoffset = -1;
 
     FILE *fragment = fopen(seqstr, "a+");
-    if (!fragment) err(1, seqstr);
-    if (fseek(fragment, 0, SEEK_END) != 0) err(1, seqstr);
+    if (!fragment) err(1, "%s", seqstr);
+    if (fseek(fragment, 0, SEEK_END) != 0) err(1, "%s", seqstr);
     long int len = ftell(fragment);
     if (len >= FRAGHDRLEN) {
         rawoffset = fragment_file_read_raw_offset(fragment);
@@ -107,8 +107,8 @@ int main(int argc, char *argv[]) {
         seqstr = format_seq(++seq);
         if (!seqstr) return 1;
         fragment = fopen(seqstr, "a+");
-        if (!fragment) err(1, seqstr);
-        if (fseek(fragment, 0, SEEK_END) != 0) err(1, seqstr);
+        if (!fragment) err(1, "%s", seqstr);
+        if (fseek(fragment, 0, SEEK_END) != 0) err(1, "%s", seqstr);
         len = ftell(fragment);
         if (len >= FRAGHDRLEN) {
             rawoffset = fragment_file_read_raw_offset(fragment);
@@ -150,8 +150,8 @@ int main(int argc, char *argv[]) {
             seqstr = format_seq(++seq);
             if (!seqstr) return 1;
             fragment = fopen(seqstr, "a+");
-            if (!fragment) err(1, seqstr);
-            if (fseek(fragment, 0, SEEK_END) != 0) err(1, seqstr);
+            if (!fragment) err(1, "%s", seqstr);
+            if (fseek(fragment, 0, SEEK_END) != 0) err(1, "%s", seqstr);
             if (ftell(fragment) != 0) errx(1, "%s: unexpected file", seqstr);
             available = mtu-FRAGHDRLEN;
             int offset = (remaining < available) ? remaining : available;
