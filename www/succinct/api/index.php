@@ -53,7 +53,17 @@ try {
     } else {
         throw new BadMethodCallException('unknown API command');
     }
-} catch (BadMethodCallException | InvalidArgumentException | LengthException $e) {
+} catch (BadMethodCallException $e) {
+    http_response_code(400);
+    Succinct::logi(TAG, $e->getMessage());
+    echo $e->getMessage();
+    exit();
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    Succinct::logi(TAG, $e->getMessage());
+    echo $e->getMessage();
+    exit();
+} catch (LengthException $e) {
     http_response_code(400);
     Succinct::logi(TAG, $e->getMessage());
     echo $e->getMessage();
