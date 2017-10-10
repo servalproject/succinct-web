@@ -97,7 +97,7 @@ function check_done {
 
     local i
     for ((i=1; i<=starts; i++)); do
-        msg=$(printf "%05d" $i)
+        local msg=$(printf "%05d" $i)
         if [ -s "$team/messages/new/$seq.$msg" -o -s "$team/messages/done/$seq.$msg" ]; then
             last_message_done=1
         else
@@ -123,6 +123,7 @@ function check_done {
 
     local next=$seq
     for ((i=2; i<=span; i++)); do
+        ((10#$next==4294967295)) && error_exit "hit maximum sequence number $team/$next"
         next=$(nextseq "$next")
         check_done $team $next 0
     done
@@ -157,12 +158,56 @@ function rebuild_msg {
     if [ $? -eq 0 ]; then
         next=$seq
         for ((i=2; i<=span; i++)); do
+            ((10#$next==4294967295)) && error_exit "hit maximum sequence number $team/$next"
             next=$(nextseq "$next")
             touch "$team/messages/done/$next.continuation"
         done
     fi
 
     mv "$tmp" "$team/messages/new/$seq.$msgpad" || exit 1
+    return 0
+}
+
+function update_ack_pointer {
+    local team=$1
+    local pointer="$team/ack"
+    local last="-1"
+    if [ -f "$pointer" ]; then
+        last=$(< "$pointer")
+    fi
+    echo "update_ack_pointer last=$last"
+    local next=$last
+    while :; do
+        [[ $next = 4294967295 ]] && error_exit "hit maximum sequence number $team/$next"
+        next=$(nextseq "$next")
+        if [ -f "$team/fragments/done/$next" ]; then
+            last=$next
+            continue
+        fi
+        [ -f "$team/fragments/partial/$next" ] || break
+
+        # if we have the file, assume we are good for now
+
+        #if fragment_is_continuation $team $next; then
+        #    [[ -e "$team/messages/done/$next.continuation" ]] || break
+        #fi
+        #local starts
+        #starts=$(fragment_msg_starts $team $next)
+        #[ $? -eq 0 ] || exit 1
+        #local i
+        #local msg
+        ## check all but final message (which may span into the next file)
+        #for ((i=1; i<=starts-1; i++)); do
+        #    msg=$(printf "%05d" $i)
+        #    [ -s "$team/messages/new/$next.$msg" -o -s "$team/messages/done/$next.$msg" ] && continue
+        #    break 2
+        #done
+        ## this fragment seems to have been properly received
+
+        last="$next"
+    done
+    echo "update_ack_pointer  new=$last"
+    printf "%s\n" "$last" > "$pointer"
     return 0
 }
 
@@ -204,3 +249,5 @@ done
 if ((starts>0)); then
     check_done $team $seq
 fi
+
+update_ack_pointer $team

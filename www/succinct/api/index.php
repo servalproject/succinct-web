@@ -136,9 +136,11 @@ class API {
             throw new Exception("could not place fragment for team $teamid with seq $seq");
         }
 
-        Succinct::rebuild_messages($teamid, $seq, false);
+        if (!Succinct::rebuild_messages($teamid, $seq, false)) {
+            throw new Exception("could not rebuild message $teamid/$seq");
+        }
 
-        echo get_next_seq($teamid);
+        print_ack($teamid);
     }
 
     public static function ack($args) {
@@ -151,12 +153,22 @@ class API {
         $teamid = strtolower($args[0]);
         // todo check if team is still valid?
 
-        echo get_next_seq($teamid);
+        print_ack($teamid);
     }
 }
 
-function get_next_seq($team) {
-    // todo implement
-    return -1;
+function print_ack($team) {
+    $ackfile = Succinct::SPOOL_DIR.'/'.$team.'/ack';
+    if (!file_exists($ackfile)) {
+        http_response_code(404);
+        return;
+    }
+    $ack = trim(file_get_contents($ackfile));
+    if (preg_match('/^0+$/', $ack)) {
+        $ack = 0;
+    } else {
+        $ack = preg_replace('/^0+/', '', $ack);
+    }
+    echo $ack;
 }
 ?>
