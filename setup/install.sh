@@ -72,6 +72,11 @@ chown -R succinct:succinct $SUCCINCT_HOME/spool
 mkdir $SUCCINCT_HOME/log
 chown -R succinct:succinct $SUCCINCT_HOME/log
 
+mysql < <<EOF
+grant all on ramp.* to 'ramp'@'localhost';
+create database ramp;
+EOF
+
 a2enmod proxy_fcgi
 a2enmod proxy_wstunnel
 a2enmod rewrite
