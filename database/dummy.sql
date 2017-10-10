@@ -1,6 +1,6 @@
-INSERT INTO teams (id, uuid, name, started, finished)
-	VALUES (1, 'dbed5e5f-8e8c-48d0-82b8-37b1d5366bd0', 'A-Team', '2016-08-29 12:00:00', NULL),
-               (2, 'cc86cb08-6b6c-402d-ad2a-a8160a88a67b', 'B-Team', '2016-08-29 13:30:00', '2016-08-29 14:00:00');
+INSERT INTO teams (id, teamid, name, started, finished)
+	VALUES (1, 'dbed5e5f8e8c48d0', 'A-Team', '2016-08-29 12:00:00', NULL),
+               (2, 'cc86cb086b6c402d', 'B-Team', '2016-08-29 13:30:00', '2016-08-29 14:00:00');
 
 INSERT INTO members (team, member_id, name, identity, joined, parted, last_location)
 	VALUES (1, 1, 'Mr T', 'mr.t@example.org', '2016-08-29 12:01:00', NULL, 2),

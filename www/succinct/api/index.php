@@ -125,12 +125,18 @@ class API {
             throw new Exception('could not decode seq');
         }
 
+        if (Succinct::team_is_finished($teamid))
+            Succinct::logw(TAG, "received fragment for finished team $teamid");
+
+        Succinct::update_lastseen($teamid, 'http', $_SERVER['REMOTE_ADDR']);
         if (Succinct::place_fragment($tmp)) {
             Succinct::logd(TAG, "received fragment for team $teamid with seq $seq");
         } else {
             unlink($tmp);
             throw new Exception("could not place fragment for team $teamid with seq $seq");
         }
+
+        Succinct::rebuild_messages($teamid, $seq, false);
 
         echo get_next_seq($teamid);
     }

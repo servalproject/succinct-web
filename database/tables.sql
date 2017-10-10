@@ -1,10 +1,15 @@
 CREATE TABLE teams (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    uuid CHAR(36) NOT NULL,
-    name CHAR(50) CHARACTER SET utf8 NOT NULL,
-    started TIMESTAMP NOT NULL DEFAULT 0,
+    teamid CHAR(16) NOT NULL UNIQUE,
+    name CHAR(50) CHARACTER SET utf8,
+    started TIMESTAMP  NULL DEFAULT NULL,
     finished TIMESTAMP NULL DEFAULT NULL,
-    rockid CHAR(50), /* todo not sure how long this should be */
+    lastseen_rock_id CHAR(50), /* todo not sure how long this should be */
+    lastseen_rock_time TIMESTAMP NULL DEFAULT NULL,
+    lastseen_sms_sender CHAR(20),
+    lastseen_sms_time TIMESTAMP NULL DEFAULT NULL,
+    lastseen_http_ip CHAR(15),
+    lastseen_http_time TIMESTAMP NULL DEFAULT NULL,
     created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated TIMESTAMP DEFAULT 0 ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY(id),

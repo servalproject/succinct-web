@@ -96,6 +96,11 @@ if ($seq === false) {
     exit();
 }
 
+if (Succinct::team_is_finished($teamid))
+    Succinct::logw(TAG, "received fragment for finished team $teamid");
+
+Succinct::update_lastseen($teamid, 'sms', $sender);
+
 if (Succinct::place_fragment($tmp)) {
     Succinct::logd(TAG, "received fragment for team $teamid with seq $seq");
 } else {

@@ -20,17 +20,26 @@ class Succinct {
     // if left as default, will be generated in update-config.sh
     const ROOT = '_SUCCINCT_HOME_';
 
+    // MySQL/MariaDB config
+    const MYSQL_HOST = 'localhost';
+    const MYSQL_USER = 'ramp';
+    const MYSQL_PASS = null;
+    const MYSQL_BASE = 'ramp';
+
     const WWW = self::ROOT . "/www";
     const LOGFILE = self::ROOT . "/log/succinct.log";
 
     const FRAGINFO = self::ROOT . '/decode/fraginfo';
     const PLACE_FRAGMENT = self::ROOT . '/decode/place_fragment';
+    const REBUILD_MESSAGES = self::ROOT . '/decode/rebuild_messages';
 
     const SPOOL_DIR = self::ROOT . '/spool';
     const TMP_DIR = self::SPOOL_DIR . '/tmp';
 
     // below here is not configuration but is a useful place to put helper functions
     // and global initialisation code rather than including another file
+
+    private static $mysqli = false;
 
     public static function fraginfo($file, $infotype) {
         if (strlen($file) == 0 || strlen($infotype) == 0) return false;
@@ -47,6 +56,69 @@ class Succinct {
         $cmd = escapeshellarg(self::PLACE_FRAGMENT).' '.escapeshellarg($file).' '.escapeshellarg(self::SPOOL_DIR);
         $out = exec($cmd, $outa, $ret);
         return ($ret == 0);
+    }
+
+    public static function rebuild_messages($team, $seq, $background = true) {
+        if (strlen($team) == '' || strlen($seq) == '') return false;
+        $cmd = 'cd '.escapeshellcmd(dirname(self::REBUILD_MESSAGES))
+            .' && '.escapeshellcmd(self::REBUILD_MESSAGES).' '.escapeshellcmd(self::SPOOL_DIR)
+            .' '.escapeshellarg($team).' '.escapeshellarg($seq);
+        if ($background) {
+            $cmd .= ' >/dev/null 2>&1 &';
+        } else {
+            $cmd .= ' 2>&1';
+        }
+        $out = exec($cmd, $outa, $ret);
+        return ($ret == 0);
+    }
+
+    private static function db_connect() {
+        if (self::$mysqli) return true;
+        self::$mysqli = new mysqli(self::MYSQL_HOST, self::MYSQL_USER, self::MYSQL_PASS, self::MYSQL_BASE);
+        if (self::$mysqli->connect_errno) {
+            self::loge('Succinct', 'update_lastseen: MySQL connection error '.self::$mysqli->connect_error);
+            self::$mysqli = false;
+            return false;
+        }
+        return true;
+    }
+
+    public static function team_is_finished($team) {
+        if (!self::db_connect()) return false;
+
+        $team_esc = self::$mysqli->real_escape_string($team);
+        $res = self::$mysqli->query("SELECT id FROM teams WHERE teamid = '$team_esc' AND finished IS NOT NULL");
+        if (!$res) {
+            self::loge('Succinct', "team_is_finished: MySQL query error ".self::$mysqli->error);
+            return false;
+        }
+        $rows = $res->num_rows;
+        $res->free();
+        return ($rows > 0);
+    }
+
+    public static function update_lastseen($team, $method, $sender) {
+        $methods = ['rock' => 'id', 'sms' => 'sender', 'http' => 'ip'];
+        if (!isset($methods[$method]))
+            throw new Exception('update_lastseen: unknown method');
+
+        if (!self::db_connect()) return false;
+
+        $senderkey = 'lastseen_'.$method.'_'.$methods[$method];
+        $timekey = 'lastseen_'.$method.'_time';
+        $sender_esc = self::$mysqli->real_escape_string($sender);
+        $team_esc = self::$mysqli->real_escape_string($team);
+        $sql = "INSERT INTO teams (teamid, $senderkey, $timekey) VALUES ('$team_esc', '$sender_esc', NOW())"
+            ." ON DUPLICATE KEY UPDATE $senderkey='$sender_esc', $timekey=NOW()";
+        $res = self::$mysqli->query($sql);
+        if (!$res) {
+            self::loge('Succinct', "update_lastseen: MySQL query error ".self::$mysqli->error);
+            return false;
+        }
+        if (self::$mysqli->affected_rows == 1) {
+            self::logd('Succinct', "update_lastseen: inserted new team $team (".self::$mysqli->insert_id.") from $method message");
+        }
+        return true;
     }
 
     private static function log($tag, $msg, $level) {
