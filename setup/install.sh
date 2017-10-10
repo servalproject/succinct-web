@@ -74,6 +74,7 @@ chown -R succinct:succinct $SUCCINCT_HOME/log
 
 a2enmod proxy_fcgi
 a2enmod proxy_wstunnel
+a2enmod rewrite
 a2enconf php7.0-fpm
 a2dissite 000-default
 a2ensite succinct
