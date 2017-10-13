@@ -45,7 +45,8 @@ int64_t fragment_file_read_seq(FILE *fragment) {
         warnx("%s: could not read enough data to get sequence number", __func__);
         return -1;
     }
-    uint32_t seq = (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
+    uint32_t seq = ((uint32_t) buf[0] << 24) | ((uint32_t) buf[1] << 16)
+                 | ((uint32_t) buf[2] << 8) | buf[3];
     return seq;
 }
 

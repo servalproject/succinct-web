@@ -27,7 +27,7 @@ msg_info fragment_file_parse_message_header(FILE *fragment, long msg_offset) {
     }
     info.type = buf[0];
     if (len == 3) {
-        info.length = (buf[1] << 8) + buf[2];
+        info.length = ((unsigned long) buf[1] << 8) + buf[2];
     }
     return info;
 }
@@ -143,7 +143,7 @@ long fragments_extract_message(uint32_t seq, int n, uint8_t *buf, int *span) {
         }
     }
 
-    long msg_len = (message_header[1] << 8) + message_header[2];
+    long msg_len = ((unsigned long) message_header[1] << 8) + message_header[2];
     long total_len = MSG_HDRLEN + msg_len;
 
     if (buf) memcpy(buf+0, message_header, total_read);
