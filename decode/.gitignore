@@ -2,4 +2,6 @@
 /fraginfo
 /fragextract
 /fragwrite
+/message_to_json
 /*.o
+/ccan/json/*.o
