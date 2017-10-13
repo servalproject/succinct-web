@@ -1172,9 +1172,9 @@ void emit_string(SB *out, const char *str)
 						strcpy(b, "\\uFFFD");
 						b += 6;
 					} else {
-						*b++ = 0xEF;
-						*b++ = 0xBF;
-						*b++ = 0xBD;
+						*((unsigned char *)b++) = 0xEF;
+						*((unsigned char *)b++) = 0xBF;
+						*((unsigned char *)b++) = 0xBD;
 					}
 					s++;
 				} else if (c < 0x1F || (c >= 0x80 && escape_unicode)) {
