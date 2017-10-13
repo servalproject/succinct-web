@@ -7,8 +7,11 @@
 #include "message.h"
 #include "fragment.h"
 
+#include "utf8.h"
+
 static_assert(MSG_TYPELEN == 1, "MSG_TYPELEN must be 1");
 static_assert(MSG_LENGTHLEN == 2, "MSG_LENGTHLEN must be 2");
+static_assert(MSG_HDRLEN == 3, "MSG_HDRLEN must be 3");
 
 msg_info fragment_file_parse_message_header(FILE *fragment, long msg_offset) {
     msg_info info;
@@ -217,4 +220,218 @@ extract_error:
     if (fragment) fclose(fragment);
     if (seqstr) free(seqstr);
     return 0;
+}
+
+static int parse_team_start(struct message_team_start *msg, uint8_t *payload, unsigned int len) {
+    if (len < 9) return 0;
+    if (payload[len-1] != '\0') return 0; // not null-terminated
+    if (8 + strlen((char *)(payload+8)) + 1 != len) return 0; // too many null characters
+    if (!utf8_validate(payload+8)) return 0;
+
+    msg->time = payload[0];
+    for (int i=1; i<8; i++) {
+        msg->time = (msg->time << 8) + payload[i];
+    }
+    msg->name = strdup((char *)(payload+8));
+    if (!msg->name) {
+        warn("%s", __func__);
+        return 0;
+    }
+    return 1;
+}
+
+static int parse_team_end(struct message_team_end *msg, uint8_t *payload, unsigned int len) {
+    if (len != 8) return 0;
+    msg->time = payload[0];
+    for (int i=1; i<8; i++) {
+        msg->time = (msg->time << 8) + payload[i];
+    }
+    return 1;
+}
+
+static int parse_member_join(struct message_member_join *msg, uint8_t *payload, unsigned int len) {
+    if (len < 7) return 0;
+    if (payload[len-1] != '\0') return 0; // not null-terminated
+    int nullchars = 0;
+    for (int i=5; i<len; i++) if (payload[i] == '\0') nullchars++;
+    if (nullchars != 2) return 0; // should have two null-terminated strings
+    if (!utf8_validate(payload+5)) return 0;
+    size_t namelen = strlen((char *)(payload+5));
+    if (!utf8_validate(payload+5+namelen+1)) return 0;
+
+    msg->member = payload[0];
+    msg->time = payload[1];
+    for (int i=1; i<4; i++) {
+        msg->time = (msg->time << 8) + payload[1+i];
+    }
+    msg->name = strdup((char *)(payload+5));
+    if (!msg->name) {
+        warn("%s", __func__);
+        return 0;
+    }
+    msg->id = strdup((char *)(payload+5+namelen+1));
+    if (!msg->id) {
+        warn("%s", __func__);
+        return 0;
+    }
+    return 1;
+}
+
+static int parse_member_part(struct message_member_part *msg, uint8_t *payload, unsigned int len) {
+    if (len != 5) return 0;
+    msg->member = payload[0];
+    msg->time = payload[1];
+    for (int i=1; i<4; i++) {
+        msg->time = (msg->time << 8) + payload[1+i];
+    }
+    return 1;
+}
+
+static int parse_location(struct message_location *msg, uint8_t *payload, unsigned int len) {
+    if (len == 0 || len%11 != 0) return 0;
+    int records = len/11;
+
+    msg->locations = malloc(records*sizeof(member_location));
+    if (!msg->locations) {
+        warn("%s", __func__);
+        return 0;
+    }
+    msg->length = records;
+    for (int i=0; i<records; i++) {
+        msg->locations[i].member = payload[i*11];
+        msg->locations[i].time = payload[i*11+1];
+        for (int j=1; j<4; j++) {
+            msg->locations[i].time = (msg->locations[i].time << 8) + payload[i*11+1+j];
+        }
+        uint64_t latlngacc = payload[i*11+5];
+        for (int j=1; j<6; j++) {
+            latlngacc = (latlngacc << 8) + payload[i*11+5+j];
+        }
+        /* see LocationFactory.java from succinct
+         *
+         * 48 least significant bits of (uint64_t) latlngacc:
+         *
+         * | (90 + lat) * 23301.686 | (180 + lng) * 23301.686 | accuracy |
+	     *         22 bits                   23 bits             3 bits
+         *
+         * accuracy: 0       <= 10m
+         *           1       <= 20m
+         *           2       <= 50m
+         *           3       <= 100m
+         *           4       <= 200m
+         *           5       <= 500m
+         *           6       <= 1000m
+         *           7        > 1000m
+         *
+         * note: 23301.686 = (2^23-1)/360 - eps
+         */
+        static const double lat_lng_scale = 23301.686;
+        static const int accs[8] = {10, 20, 50, 100, 200, 500, 1000, -1};
+        msg->locations[i].lat = (latlngacc >> 26)/lat_lng_scale - 90.0;
+        msg->locations[i].lng = ((latlngacc >> 3) & 0x7fffff)/lat_lng_scale - 180.0;
+        msg->locations[i].acc = accs[latlngacc & 0x7];
+    }
+    return 1;
+}
+
+static int parse_chat(struct message_chat *msg, uint8_t *payload, unsigned int len) {
+    if (len < 7) return 0;
+    if (payload[len-1] != '\0') return 0; // not null-terminated
+    int nullchars = 0;
+    for (int i=5; i<len; i++) if (payload[i] == '\0') nullchars++;
+    if (nullchars != 1) return 0; // should have one null-terminated string
+    if (!utf8_validate(payload+5)) return 0;
+
+    msg->member = payload[0];
+    msg->time = payload[1];
+    for (int i=1; i<4; i++) {
+        msg->time = (msg->time << 8) + payload[1+i];
+    }
+    msg->message = strdup((char *)(payload+5));
+    if (!msg->message) {
+        warn("%s", __func__);
+        return 0;
+    }
+    return 1;
+}
+
+static int parse_magpi_form(struct message_magpi_form *msg, uint8_t *payload, unsigned int len) {
+    if (len < 6) return 0;
+    msg->member = payload[0];
+    msg->time = payload[1];
+    for (int i=1; i<4; i++) {
+        msg->time = (msg->time << 8) + payload[1+i];
+    }
+    msg->length = len-5;
+    msg->data = malloc(len-5);
+    if (!msg->data) {
+        warn("%s", __func__);
+        return 0;
+    }
+    memcpy(msg->data, payload+5, len-5);
+    return 1;
+}
+
+message_t parse_message(uint8_t *buf, unsigned int len) {
+    message_t msg;
+    msg.info.type = MSG_TYPE_ERROR;
+    if (buf == NULL || len == 0) return msg;
+    if (len < MSG_HDRLEN) {
+        warnx("%s: len too short", __func__);
+        return msg;
+    }
+    long payload_len = ((unsigned long) buf[1] << 8) + buf[2];
+    if (len != MSG_HDRLEN + payload_len) {
+        warnx("%s: len does not match payload length", __func__);
+        return msg;
+    }
+    uint8_t type = buf[0];
+    int okay;
+    uint8_t *payload = buf+MSG_HDRLEN;
+    switch (type) {
+        case TEAM_START: okay = parse_team_start(&msg.data.team_start, payload, payload_len); break;
+        case TEAM_END: okay = parse_team_end(&msg.data.team_end, payload, payload_len); break;
+        case MEMBER_JOIN: okay = parse_member_join(&msg.data.member_join, payload, payload_len); break;
+        case MEMBER_PART: okay = parse_member_part(&msg.data.member_part, payload, payload_len); break;
+        case LOCATION: okay = parse_location(&msg.data.location, payload, payload_len); break;
+        case CHAT: okay = parse_chat(&msg.data.chat, payload, payload_len); break;
+        case MAGPI_FORM: okay = parse_magpi_form(&msg.data.magpi_form, payload, payload_len); break;
+        default:
+            warnx("%s: unknown message type (%d)", __func__, type);
+            return msg;
+    }
+    if (!okay) {
+        warnx("%s: error while parsing message of type %d", __func__, type);
+        return msg;
+    }
+    msg.info.type = type;
+    msg.info.length = payload_len;
+    return msg;
+}
+
+void free_message(message_t msg) {
+    switch (msg.info.type) {
+        case TEAM_START:
+            free(msg.data.team_start.name);
+            break;
+        case TEAM_END:
+            break;
+        case MEMBER_JOIN:
+            free(msg.data.member_join.name);
+            free(msg.data.member_join.id);
+            break;
+        case MEMBER_PART:
+            break;
+        case LOCATION:
+            free(msg.data.location.locations);
+            break;
+        case CHAT:
+            free(msg.data.chat.message);
+            break;
+        case MAGPI_FORM:
+            free(msg.data.magpi_form.data);
+            break;
+        default:
+            break;
+    }
 }
