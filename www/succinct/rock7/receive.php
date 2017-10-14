@@ -16,39 +16,60 @@ if (!isset($_GET['key']) || $_GET['key'] !== Succinct::ROCK_CALLBACK_KEY) {
     exit();
 }
 
+// log request
+
+$req = [date('Y-m-d H:i:s O'), $_POST];
+file_put_contents(Succinct::ROOT.'/log/rock7.log', json_encode($req)."\n", FILE_APPEND|LOCK_EX);
+
 const MAX_DATA_LENGTH = 1000;
 const MIN_FRAGMENT_SIZE = 13;
 
+// require all _POST variables to be scalar
+$postargs = array_filter($_POST, 'is_scalar');
+
+if (count($postargs) != count($_POST)) {
+    http_response_code(400);
+    Succinct::loge(TAG, 'received non-scalar POST parameters');
+    exit();
+}
+
+// of all the possible variables, these are the main ones we need
 $filter = [
-    'ref'         => ['filter'  => FILTER_UNSAFE_RAW,
-                      'flags'   => FILTER_REQUIRE_SCALAR],
-    'userKey'     => ['filter'  => FILTER_UNSAFE_RAW,
-                      'flags'   => FILTER_REQUIRE_SCALAR],
-    'transmitTime'=> ['filter'  => FILTER_VALIDATE_REGEXP,
-                      'flags'   => FILTER_REQUIRE_SCALAR,
-                      'options' => ['regexp' => '/^\d{8}T\d{6}Z$/']],
-    'data'        => ['filter'  => FILTER_UNSAFE_RAW,
-                      'flags'   => FILTER_REQUIRE_SCALAR]
+    'device_type' => FILTER_UNSAFE_RAW,
+    'serial'      => ['filter'  => FILTER_VALIDATE_INT,
+                      'options' => ['min_range' => 0, 'max_range' => PHP_INT_MAX]],
+    'momsn'       => ['filter'  => FILTER_VALIDATE_INT,
+                      'options' => ['min_range' => 0, 'max_range' => PHP_INT_MAX]],
+    'trigger'     => FILTER_UNSAFE_RAW,
+    'userData'    => ['filter'  => FILTER_VALIDATE_REGEXP,
+                      'options' => ['regexp' => '/^(?:[0-9a-f][0-9a-f])+$/i']]
 ];
 
-$args = filter_input_array(INPUT_POST, $filter);
+$args = filter_var_array($postargs, $filter);
 
-$ref = $args['ref'];
-$user_key = $args['userKey'];
-$time = $args['transmitTime'];
-$data = $args['data'];
+$device_type = $args['device_type'];
+$serial = $args['serial'];
+$momsn = $args['momsn'];
+$trigger = $args['trigger'];
+$data = $args['userData'];
 
-if ($ref === null || $user_key === null || $data == null) {
+if ($device_type === null || $serial === null || $trigger === null) {
     http_response_code(400);
     Succinct::loge(TAG, 'missing/invalid POST parameters');
     exit();
 }
 
-// from here just return HTTP 200, subsequent errors are probably not TextMagic's mistake
+// from here just return HTTP 200, subsequent errors are probably not Rock7's mistake
 
-Succinct::logd(TAG, "received message $ref from $user_key");
+Succinct::logd(TAG, "received $trigger from $serial ($device_type; $momsn)");
 
-if ($time === null) Succinct::logi(TAG, 'unexpected/missing transmitTime');
+// only process raw messages
+if ($trigger != 'BLE_RAW') exit();
+
+if ($data === null) {
+    Succinct::loge(TAG, 'userData is invalid or absent');
+    exit();
+}
 
 if (strlen($data) > MAX_DATA_LENGTH) {
     Succinct::logw(TAG, 'data longer than limit');
@@ -105,7 +126,6 @@ if (Succinct::place_fragment($tmp)) {
 
 function data_to_fragment($data) {
     Succinct::logv(TAG, "data: $data");
-    // todo decode properly, documentation just says hex-encoded but that could be any number of things
-    return $data;
+    return hex2bin($data);
 }
 ?>
