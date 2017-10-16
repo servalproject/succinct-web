@@ -19,8 +19,10 @@ command -v mktemp >/dev/null 2>&1 || error_exit "$0 requires mktemp"
 command -v realpath >/dev/null 2>&1 || error_exit "$0 requires realpath"
 command -v ./fraginfo >/dev/null 2>&1 || error_exit "$0 requires ./fraginfo"
 command -v ./fragextract >/dev/null 2>&1 || error_exit "$0 requires ./fragextract"
+command -v ./message_to_json > /dev/null 2>&1 || error_exit "$0 requires ./message_to_json"
 FRAGINFO=$(realpath ./fraginfo)
 FRAGEXTRACT=$(realpath ./fragextract)
+MESSAGETOJSON=$(realpath ./message_to_json)
 
 [ -n "$dir" ] || error_exit "must specify root directory"
 [[ $team =~ ^[0-9a-f]{16}$ ]] || error_exit "$team: invalid team identifier"
@@ -165,6 +167,12 @@ function rebuild_msg {
     fi
 
     mv "$tmp" "$team/messages/new/$seq.$msgpad" || exit 1
+    if "$MESSAGETOJSON" "$team" "$team/messages/new/$seq.$msgpad" > "json/tmp/$team-$seq.$msgpad.json"; then
+        mv "json/tmp/$team-$seq.$msgpad.json" "json/new" || return 0
+        mv "$team/messages/new/$seq.$msgpad" "$team/messages/done"
+    else
+        rm -f "json/tmp/$team-$seq.$msgpad.json"
+    fi
     return 0
 }
 

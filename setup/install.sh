@@ -67,6 +67,9 @@ chmod +x $SUCCINCT_HOME/git/hooks/post-receive
 chown -R $SSH_USER:succinct $SUCCINCT_HOME/git
 
 mkdir -p $SUCCINCT_HOME/spool/tmp
+mkdir -p $SUCCINCT_HOME/spool/json/tmp
+mkdir -p $SUCCINCT_HOME/spool/json/new
+mkdir -p $SUCCINCT_HOME/spool/json/done
 chown -R succinct:succinct $SUCCINCT_HOME/spool
 
 mkdir $SUCCINCT_HOME/log
