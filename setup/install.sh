@@ -44,7 +44,7 @@ cat > /etc/apache2/sites-available/succinct.conf << EOF
         AllowOverride All
     </Directory>
 
-	ProxyPass "/eoc-ws/" "ws://127.0.0.1:3000/"
+	ProxyPass "/eoc-ws" "ws://127.0.0.1:3000/"
 </VirtualHost>
 EOF
 

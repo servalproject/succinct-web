@@ -1,11 +1,8 @@
 'use strict';
 
-const express = require('express');
-const app = express();
-const webroot = '../www/';
 const max_payload = 2048;
-const expressWs = require('express-ws')(app, null, {wsOptions: {maxPayload: max_payload}});
-const wss = expressWs.getWss();
+const ws_port = 3000;
+const WebSocket = require('ws');
 const config = require('./config');
 
 const Db = require('./db');
@@ -16,25 +13,26 @@ const auth_timeout = 30*1000;
 
 const db = new Db(config.mysql);
 
+var wss;
 var active;
-
-app.use(express.static(webroot));
-
-app.ws('/test', function (ws, req) {
-    // todo check origin and disconnect if invalid
-    console.log('socket', req.headers.origin);
-
-    try {
-        var conn = new Connection(ws);
-        wait_for_auth(conn);
-    } catch (e) {
-        console.error(e);
-    }
-});
 
 db.connect()
     .then(init_teams)
-    .then(() => { app.listen(3000); })
+    .then(() => {
+        wss = new WebSocket.Server({ port: ws_port, maxPayload: max_payload});
+        wss.on('connection', function (ws) {
+            console.log(ws);
+            var req = ws.upgradeReq;
+            console.log('socket', req.headers.origin);
+
+            try {
+                var conn = new Connection(ws);
+                wait_for_auth(conn);
+            } catch (e) {
+                console.error(e);
+            }
+        });
+    })
     .catch(err => {
         console.error(err);
         db.disconnect();

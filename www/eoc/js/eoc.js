@@ -63,7 +63,7 @@ var socket;
 // todo remove this delay
 // only there to ensure FireFox web tools have a chance to see the WS connection
 setTimeout(function () {
-    socket = new WebSocket('ws://' + location.host + '/test');
+    socket = new WebSocket('ws://' + location.host + '/eoc-ws');
 
     socket.onmessage = handle_message;
 
