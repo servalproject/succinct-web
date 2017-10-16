@@ -60,6 +60,7 @@ if ($device_type === null || $serial === null || $trigger === null) {
 }
 
 // from here just return HTTP 200, subsequent errors are probably not Rock7's mistake
+fastcgi_finish_request();
 
 Succinct::logd(TAG, "received $trigger from $serial ($device_type; $momsn)");
 
@@ -122,6 +123,11 @@ if (Succinct::place_fragment($tmp)) {
 } else {
     Succinct::loge(TAG, "could not place fragment for team $teamid with seq $seq");
     unlink($tmp);
+    exit();
+}
+
+if (!Succinct::rebuild_messages($teamid, $seq)) {
+    Succinct::loge(TAG, "could not start process to rebuild messages for team $teamid seq $seq");
 }
 
 function data_to_fragment($data) {
