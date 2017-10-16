@@ -62,11 +62,10 @@ class Succinct {
         if (strlen($team) == '' || strlen($seq) == '') return false;
         $cmd = 'cd '.escapeshellcmd(dirname(self::REBUILD_MESSAGES))
             .' && '.escapeshellcmd(self::REBUILD_MESSAGES).' '.escapeshellcmd(self::SPOOL_DIR)
-            .' '.escapeshellarg($team).' '.escapeshellarg($seq);
+            .' '.escapeshellarg($team).' '.escapeshellarg($seq)
+            .' > '.escapeshellarg(self::ROOT . '/log/rebuild.log').' 2>&1';
         if ($background) {
-            $cmd .= ' >/dev/null 2>&1 &';
-        } else {
-            $cmd .= ' 2>&1';
+            $cmd .= ' &';
         }
         $out = exec($cmd, $outa, $ret);
         return ($ret == 0);
