@@ -51,55 +51,55 @@ int main(int argc, char *argv[]) {
     }
 
     JsonNode *root = json_mkobject();
-    json_append_member(root, "team", json_mkstring(teamid));
+    json_append_member(root, u8"team", json_mkstring(teamid));
 
     switch (msg.info.type) {
         case TEAM_START:
-            json_append_member(root, "type", json_mkstring("start"));
-            json_append_member(root, "time", json_mknumber(msg.data.team_start.time));
-            json_append_member(root, "name", json_mkstring(msg.data.team_start.name));
+            json_append_member(root, u8"type", json_mkstring(u8"start"));
+            json_append_member(root, u8"time", json_mknumber(msg.data.team_start.time));
+            json_append_member(root, u8"name", json_mkstring(msg.data.team_start.name));
             break;
         case TEAM_END:
-            json_append_member(root, "type", json_mkstring("end"));
-            json_append_member(root, "time", json_mknumber(msg.data.team_end.time));
+            json_append_member(root, u8"type", json_mkstring(u8"end"));
+            json_append_member(root, u8"time", json_mknumber(msg.data.team_end.time));
             break;
         case MEMBER_JOIN:
-            json_append_member(root, "type", json_mkstring("join"));
-            json_append_member(root, "member", json_mknumber(msg.data.member_join.member));
+            json_append_member(root, u8"type", json_mkstring(u8"join"));
+            json_append_member(root, u8"member", json_mknumber(msg.data.member_join.member));
             json_append_member(root, "reltime", json_mknumber(100.0*msg.data.member_join.time));
-            json_append_member(root, "name", json_mkstring(msg.data.member_join.name));
-            json_append_member(root, "id", json_mkstring(msg.data.member_join.id));
+            json_append_member(root, u8"name", json_mkstring(msg.data.member_join.name));
+            json_append_member(root, u8"id", json_mkstring(msg.data.member_join.id));
             break;
         case MEMBER_PART:
-            json_append_member(root, "type", json_mkstring("part"));
-            json_append_member(root, "member", json_mknumber(msg.data.member_part.member));
-            json_append_member(root, "reltime", json_mknumber(100.0*msg.data.member_part.time));
+            json_append_member(root, u8"type", json_mkstring(u8"part"));
+            json_append_member(root, u8"member", json_mknumber(msg.data.member_part.member));
+            json_append_member(root, u8"reltime", json_mknumber(100.0*msg.data.member_part.time));
             break;
         case LOCATION:
-            json_append_member(root, "type", json_mkstring("location"));
+            json_append_member(root, u8"type", json_mkstring(u8"location"));
             JsonNode *locations = json_mkarray();
             for (int i=0; i < msg.data.location.length; i++) {
                 JsonNode *obj = json_mkobject();
                 member_location location = msg.data.location.locations[i];
-                json_append_member(obj, "member", json_mknumber(location.member));
-                json_append_member(obj, "reltime", json_mknumber(100.0*location.time));
-                json_append_member(obj, "lat", json_mknumber(location.lat));
-                json_append_member(obj, "lng", json_mknumber(location.lng));
-                json_append_member(obj, "acc", json_mknumber(location.acc));
+                json_append_member(obj, u8"member", json_mknumber(location.member));
+                json_append_member(obj, u8"reltime", json_mknumber(100.0*location.time));
+                json_append_member(obj, u8"lat", json_mknumber(location.lat));
+                json_append_member(obj, u8"lng", json_mknumber(location.lng));
+                json_append_member(obj, u8"acc", json_mknumber(location.acc));
                 json_append_element(locations, obj);
             }
-            json_append_member(root, "locations", locations);
+            json_append_member(root, u8"locations", locations);
             break;
         case CHAT:
-            json_append_member(root, "type", json_mkstring("chat"));
-            json_append_member(root, "member", json_mknumber(msg.data.chat.member));
-            json_append_member(root, "reltime", json_mknumber(100.0*msg.data.chat.time));
-            json_append_member(root, "message", json_mkstring(msg.data.chat.message));
+            json_append_member(root, u8"type", json_mkstring(u8"chat"));
+            json_append_member(root, u8"member", json_mknumber(msg.data.chat.member));
+            json_append_member(root, u8"reltime", json_mknumber(100.0*msg.data.chat.time));
+            json_append_member(root, u8"message", json_mkstring(msg.data.chat.message));
             break;
         case MAGPI_FORM:
-            json_append_member(root, "type", json_mkstring("magpi-form"));
-            json_append_member(root, "member", json_mknumber(msg.data.magpi_form.member));
-            json_append_member(root, "reltime", json_mknumber(100.0*msg.data.magpi_form.time));
+            json_append_member(root, u8"type", json_mkstring(u8"magpi-form"));
+            json_append_member(root, u8"member", json_mknumber(msg.data.magpi_form.member));
+            json_append_member(root, u8"reltime", json_mknumber(100.0*msg.data.magpi_form.time));
             char *hexdata = malloc(2*msg.data.magpi_form.length+1);
             if (!hexdata) err(1, "malloc");
             for (int i=0; i<msg.data.magpi_form.length; i++) {
@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
                 hexdata[2*i+1] = utf8hex[byte & 0xf];
             }
             hexdata[2*msg.data.magpi_form.length] = '\0';
-            json_append_member(root, "hexdata", json_mkstring(hexdata));
+            json_append_member(root, u8"hexdata", json_mkstring(hexdata));
             free(hexdata);
             break;
         default:
