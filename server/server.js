@@ -2,19 +2,22 @@
 
 const max_payload = 2048;
 const ws_port = 3000;
-const WebSocket = require('ws');
-const config = require('./config');
+const auth_timeout = 30*1000;
+const json_dir = '../spool/json';
 
+const fs = require('fs');
+const WebSocket = require('ws');
+
+const config = require('./config');
 const Db = require('./db');
 const Connection = require('./connection');
 const teamdata = require('./teamdata');
-
-const auth_timeout = 30*1000;
 
 const db = new Db(config.mysql);
 
 var wss;
 var active;
+var watcher;
 
 db.connect()
     .then(init_teams)
@@ -32,6 +35,11 @@ db.connect()
                 console.error(e);
             }
         });
+
+        watcher = fs.watch(json_dir+'/new', json_watcher);
+        // process any files currently in the directory
+        var existing = fs.readdirSync(json_dir+'/new');
+        existing.forEach(f => json_watcher('rename', f));
     })
     .catch(err => {
         console.error(err);
@@ -71,6 +79,18 @@ function grant_access(conn) {
     conn.on('chat', message);
     conn.at('/teams', get_teams);
     conn.at(/^\/team\/([1-9][0-9]{0,8})\/chat/, get_team_chat);
+}
+
+function json_watcher(type, filename) {
+    if (type != 'rename') return;
+    try {
+        var json = fs.readFileSync(json_dir+'/new/'+filename, {encoding: 'utf8'});
+    } catch (err) {
+        return;
+    }
+    var obj = JSON.parse(json);
+    fs.renameSync(json_dir+'/new/'+filename, json_dir+'/done/'+filename);
+    console.log(obj);
 }
 
 async function init_teams() {
