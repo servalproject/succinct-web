@@ -6,16 +6,16 @@ const WebSocket = require('ws');
 const config = require('./config');
 const Db = require('./db');
 const Connection = require('./connection');
-const teamdata = require('./teamdata');
+const TeamData = require('./teamdata');
 
 const db = new Db(config.mysql);
 
 var wss;
-var active;
+var teamdata;
 var watcher;
 
 db.connect()
-    .then(init_teams)
+    .then(init_teamdata)
     .then(() => {
         wss = new WebSocket.Server({ port: config.ws_port, maxPayload: config.max_payload});
         wss.on('connection', function (ws, req) {
@@ -63,7 +63,7 @@ function authenticate(data, conn) {
     // try to ensure that rpc-response arrives before push data
     conn.timer(function () {
         conn.subscribed = true;
-        conn.push('/teams', teamdata.add_team_cursors(active));
+        conn.push('/teams', teamdata.active_teams_with_cursors());
     }, 50);
 
     return true;
@@ -87,9 +87,9 @@ function json_watcher(type, filename) {
     console.log(obj);
 }
 
-async function init_teams() {
-    active = await db.active_teams();
-    console.log(require('util').inspect(active, false, null));
+async function init_teamdata() {
+    teamdata = await TeamData.init(db);
+    console.log(require('util').inspect(teamdata.active, false, null));
 }
 
 async function message(data, conn) {
@@ -122,7 +122,7 @@ async function get_teams(options, conn) {
     }
     conn.log('getting teams before', before);
     var teams = await db.teams_before(before, 20);
-    return teamdata.add_team_cursors(teams, before);
+    return TeamData.add_team_cursors(teams, before);
 }
 
 async function get_team_chat(options, conn, path, match) {
@@ -150,5 +150,5 @@ async function get_team_chat(options, conn, path, match) {
     }
     conn.log('getting chats for team '+id+' before', before);
     var chats = await db.chats_before(id, before, 20);
-    return teamdata.add_chat_cursors(chats, id, before);
+    return TeamData.add_chat_cursors(chats, id, before);
 }
