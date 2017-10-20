@@ -63,12 +63,13 @@ class TeamData {
         team.promise = new Promise((resolve, reject) => { done = resolve; });
 
         await this.db.team_start(teamid, name, time);
-        await update_team_promise(this.db, teamid, team, false);
+        await update_team_promise(this.db, teamid, team, false, true);
         if (team.state != 'active') {
             console.error('team not registered properly as started', teamid);
         }
-        done(team);
+        this.active.push(team.team);
         console.log('started team', team);
+        done(team);
     }
 
     async end(teamid, time) {
@@ -217,8 +218,8 @@ function copy_fields(input, fields) {
     return output;
 }
 
-function update_team_promise(db, teamid, team, warn_active=true) {
-    team.promise = db.team_by_teamid(teamid).then(t => {
+function update_team_promise(db, teamid, team, warn_active=true, fill=false) {
+    team.promise = db.team_by_teamid(teamid, fill).then(t => {
         delete team.promise;
         if (t == null) {
             team.state = 'unknown';

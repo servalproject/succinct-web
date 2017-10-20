@@ -19,9 +19,6 @@ db.connect()
     .then(() => {
         wss = new WebSocket.Server({ port: config.ws_port, maxPayload: config.max_payload});
         wss.on('connection', function (ws, req) {
-            console.log(ws);
-            console.log('socket', req.headers.origin);
-
             try {
                 var conn = new Connection(ws);
                 wait_for_auth(conn);

@@ -30,12 +30,13 @@ class Db {
         return to_normal_object(teams);
     }
 
-    async team_by_teamid(teamid) {
+    async team_by_teamid(teamid, fill=false) {
         if (!this.connected) {
             throw new Error('mysql not connected');
         }
         var [teams] = await this.execute('SELECT * FROM teams WHERE teamid = ?', [teamid]);
         if (teams.length == 0) return null;
+        if (fill) await fill_team_data(this, teams, 1);
         return to_normal_object(teams[0]);
     }
 
