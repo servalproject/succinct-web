@@ -8,8 +8,47 @@ class TeamData {
         this.active = active;
         active.forEach((team, index) => this.map.set(team.teamid, {
             id: team.id,
-            state: 'active'
+            state: 'active',
+            team: team
         }));
+    }
+
+    lookup(teamid, may_promise=true) {
+        var team = this.map.get(teamid);
+        if (typeof team != 'undefined') {
+            if (team.state == 'pending') {
+                return may_promise ? team.promise : null;
+            }
+            return team;
+        }
+        if (!may_promise) return null;
+        team = {
+            id: -1,
+            state: 'pending',
+        };
+        this.map.set(teamid, team);
+        team.promise = this.db.team_by_teamid(teamid).then(t => {
+            delete team.promise;
+            if (t == null) {
+                team.state = 'unknown';
+                return team;
+            }
+            team.id = t.id;
+            if (t.started === null) {
+                team.state = 'starting';
+                return team;
+            }
+            if (t.finished !== null) {
+                team.state = 'inactive';
+                return team;
+            } else {
+                console.warn('TeamData', 'unexpected active team in database');
+                team.state = 'active';
+                team.team = t;
+                return team;
+            }
+        });
+        return team.promise;
     }
 
     active_teams_with_cursors() {
