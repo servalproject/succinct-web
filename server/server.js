@@ -18,9 +18,8 @@ db.connect()
     .then(init_teams)
     .then(() => {
         wss = new WebSocket.Server({ port: config.ws_port, maxPayload: config.max_payload});
-        wss.on('connection', function (ws) {
+        wss.on('connection', function (ws, req) {
             console.log(ws);
-            var req = ws.upgradeReq;
             console.log('socket', req.headers.origin);
 
             try {
