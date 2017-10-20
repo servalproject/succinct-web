@@ -1,4 +1,8 @@
 {
+    "max_payload": 2048,
+    "ws_port": 3000,
+    "auth_timeout": 30000,
+    "json_dir": "../spool/json",
     "mysql": {
         "host": "localhost",
         "user": "ramp",

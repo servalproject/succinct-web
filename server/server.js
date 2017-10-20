@@ -1,10 +1,5 @@
 'use strict';
 
-const max_payload = 2048;
-const ws_port = 3000;
-const auth_timeout = 30*1000;
-const json_dir = '../spool/json';
-
 const fs = require('fs');
 const WebSocket = require('ws');
 
@@ -22,7 +17,7 @@ var watcher;
 db.connect()
     .then(init_teams)
     .then(() => {
-        wss = new WebSocket.Server({ port: ws_port, maxPayload: max_payload});
+        wss = new WebSocket.Server({ port: config.ws_port, maxPayload: config.max_payload});
         wss.on('connection', function (ws) {
             console.log(ws);
             var req = ws.upgradeReq;
@@ -36,9 +31,9 @@ db.connect()
             }
         });
 
-        watcher = fs.watch(json_dir+'/new', json_watcher);
+        watcher = fs.watch(config.json_dir+'/new', json_watcher);
         // process any files currently in the directory
-        var existing = fs.readdirSync(json_dir+'/new');
+        var existing = fs.readdirSync(config.json_dir+'/new');
         existing.forEach(f => json_watcher('rename', f));
     })
     .catch(err => {
@@ -53,7 +48,7 @@ function wait_for_auth(conn) {
         if (conn.authenticated) return;
         conn.log('authentication timeout reached');
         conn.close(4401, 'No authentication received');
-    }, auth_timeout);
+    }, config.auth_timeout);
 }
 
 function authenticate(data, conn) {
@@ -84,12 +79,12 @@ function grant_access(conn) {
 function json_watcher(type, filename) {
     if (type != 'rename') return;
     try {
-        var json = fs.readFileSync(json_dir+'/new/'+filename, {encoding: 'utf8'});
+        var json = fs.readFileSync(config.json_dir+'/new/'+filename, {encoding: 'utf8'});
     } catch (err) {
         return;
     }
     var obj = JSON.parse(json);
-    fs.renameSync(json_dir+'/new/'+filename, json_dir+'/done/'+filename);
+    fs.renameSync(config.json_dir+'/new/'+filename, config.json_dir+'/done/'+filename);
     console.log(obj);
 }
 
