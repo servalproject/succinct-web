@@ -42,8 +42,13 @@ class TeamData {
             console.warn('Cannot lookup member of team with no ID in database', teamid+'/'+member);
             team.members[member] = null;
         } else {
-            var cache = membercache([await this.db.member_by_pos(team.id, member)]);
-            team.members[member] = cache[0];
+            let m = await this.db.member_by_pos(team.id, member);
+            if (m === null) {
+                team.members[member] = null;
+            } else {
+                let cache = membercache([m]);
+                team.members[member] = cache[0];
+            }
         }
         return team.members[member];
     }
