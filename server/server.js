@@ -1,18 +1,18 @@
 'use strict';
 
-const fs = require('fs');
 const WebSocket = require('ws');
 
 const config = require('./config');
 const Db = require('./db');
 const Connection = require('./connection');
 const TeamData = require('./teamdata');
+const MsgQueue = require('./msgqueue');
 
 const db = new Db(config.mysql);
 
 var wss;
 var teamdata;
-var watcher;
+var msgqueue;
 
 db.connect()
     .then(init_teamdata)
@@ -30,10 +30,7 @@ db.connect()
             }
         });
 
-        watcher = fs.watch(config.json_dir+'/new', json_watcher);
-        // process any files currently in the directory
-        var existing = fs.readdirSync(config.json_dir+'/new');
-        existing.forEach(f => json_watcher('rename', f));
+        msgqueue = new MsgQueue(teamdata, config.json_dir);
     })
     .catch(err => {
         console.error(err);
@@ -73,18 +70,6 @@ function grant_access(conn) {
     conn.on('chat', message);
     conn.at('/teams', get_teams);
     conn.at(/^\/team\/([1-9][0-9]{0,8})\/chat/, get_team_chat);
-}
-
-function json_watcher(type, filename) {
-    if (type != 'rename') return;
-    try {
-        var json = fs.readFileSync(config.json_dir+'/new/'+filename, {encoding: 'utf8'});
-    } catch (err) {
-        return;
-    }
-    var obj = JSON.parse(json);
-    fs.renameSync(config.json_dir+'/new/'+filename, config.json_dir+'/done/'+filename);
-    console.log(obj);
 }
 
 async function init_teamdata() {

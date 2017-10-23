@@ -63,6 +63,50 @@ class Db {
         return to_normal_object(chats);
     }
 
+    async team_start(teamid, name, time) {
+        var res = await this.execute('INSERT INTO teams (teamid, name, started) VALUES (?, ?, FROM_UNIXTIME(?)) ON DUPLICATE KEY UPDATE name=?, started=FROM_UNIXTIME(?)',
+            [teamid, name, time/1000, name, time/1000]);
+        console.log(res);
+    }
+
+    async member_by_pos(id, member) {
+        if (!this.connected) {
+            throw new Error('mysql not connected');
+        }
+        var [members] = await this.execute('SELECT * FROM members WHERE team = ? AND member_id = ?', [id, member]);
+        if (members.length == 0) return null;
+        return to_normal_object(members[0]);
+    }
+
+    async member_join(team, member, name, id, time) {
+        if (!this.connected) throw new Error('mysql not connected');
+        if (team < 0) throw new Error('invalid team id');
+        await this.execute('INSERT INTO members (team, member_id, name, identity, joined) VALUES (?, ?, ?, ?, FROM_UNIXTIME(?))',
+            [team, member, name, id, time/1000]);
+    }
+
+    async update_location(team, member, lat, lng, acc, time, islatest=false) {
+        var [res] = await this.execute('INSERT IGNORE INTO locations (team, member_id, lat, lng, accuracy, time) VALUES (?, ?, ?, ?, ?, FROM_UNIXTIME(?))',
+            [team, member, lat, lng, acc, time/1000]);
+        var locid = res.insertId;
+        if (islatest) {
+            await this.execute('UPDATE members SET last_location = ? WHERE team = ? AND member_id = ?', [locid, team, member]);
+        }
+        return locid;
+    }
+
+    async location_time(id) {
+        var [times] = await this.execute('SELECT time FROM locations WHERE id = ?', [id]);
+        if (times.length == 0) return null;
+        return times[0].time;
+    }
+
+    async insert_chat(team, sender, message, time) {
+        var [res] = await this.execute('INSERT INTO chat (team, sender, message, time) VALUES (?, ?, ?, FROM_UNIXTIME(?))',
+            [team, sender, message, time/1000]);
+        return res.insertId;
+    }
+
     // does not use mysql2 cached statements
     async query(sql, vals, ...args) {
         var result = await this.conn.query(sql, vals, ...args);

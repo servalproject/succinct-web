@@ -9,7 +9,9 @@ class TeamData {
         active.forEach((team, index) => this.map.set(team.teamid, {
             id: team.id,
             state: 'active',
-            team: team
+            team: team,
+            members: membercache(team.members),
+            epoch: Date.parse(team.started)
         }));
     }
 
@@ -25,30 +27,109 @@ class TeamData {
         team = {
             id: -1,
             state: 'pending',
+            members: {}
         };
         this.map.set(teamid, team);
-        team.promise = this.db.team_by_teamid(teamid).then(t => {
-            delete team.promise;
-            if (t == null) {
-                team.state = 'unknown';
-                return team;
+        return update_team_promise(this.db, teamid, team);
+    }
+
+    async lookup_member(teamid, member) {
+        var team = await this.lookup(teamid);
+        if (typeof team.members[member] == 'object') {
+            return team.members[member];
+        }
+        if (team.id < 0) {
+            console.warn('Cannot lookup member of team with no ID in database', teamid+'/'+member);
+            team.members[member] = null;
+        } else {
+            var cache = membercache([await this.db.member_by_pos(team.id, member)]);
+            team.members[member] = cache[0];
+        }
+        return team.members[member];
+    }
+
+    async start(teamid, name, time) {
+        var team = await this.lookup(teamid);
+        if (!(team.state == 'unknown' || team.state == 'starting'))
+            throw new Error('unexpected team state for start: '+team.state);
+
+        var done;
+        team.state = 'pending';
+        team.promise = new Promise((resolve, reject) => { done = resolve; });
+
+        await this.db.team_start(teamid, name, time);
+        await update_team_promise(this.db, teamid, team, false);
+        if (team.state != 'active') {
+            console.error('team not registered properly as started', teamid);
+        }
+        done(team);
+        console.log('started team', team);
+    }
+
+    async end(teamid, time) {
+        throw new Error('TeamData.end() not implemented yet');
+    }
+
+    async add_location(teamid, member, lat, lng, acc, time) {
+        var team = await this.lookup(teamid);
+        if (!(team.state == 'active' || team.state == 'inactive'))
+            throw new Error('unexpected team state for add_location: '+team.state);
+
+        var m = await this.lookup_member(teamid, member);
+        if (m === null)
+            throw new Error('unknown team member for add_location: '+teamid+'/'+member);
+
+        var islatest;
+        if (m.last_location === null) {
+            islatest = true;
+        } else {
+            if (m.last_location_time === null) {
+                let lastfix = await this.db.location_time(m.last_location);
+                if (lastfix === null) {
+                    throw new Error('Could not get location timestamp for id', m.last_location);
+                }
+                m.last_location_time = lastfix.getTime();
             }
-            team.id = t.id;
-            if (t.started === null) {
-                team.state = 'starting';
-                return team;
+            if (time === m.last_location_time) {
+                console.warn('Timestamp collision in add_location, ignoring new location');
+                return;
             }
-            if (t.finished !== null) {
-                team.state = 'inactive';
-                return team;
-            } else {
-                console.warn('TeamData', 'unexpected active team in database');
-                team.state = 'active';
-                team.team = t;
-                return team;
-            }
-        });
-        return team.promise;
+            islatest = (time > m.last_location_time);
+        }
+        var locid = await this.db.update_location(team.id, member, lat, lng, acc, time, islatest);
+        if (islatest) {
+            m.last_location = locid;
+            m.last_location_time = time;
+        }
+    }
+
+    async join(teamid, member, name, id, time) {
+        var team = await this.lookup(teamid);
+        if (!(team.state == 'active' || team.state == 'inactive'))
+            throw new Error('unexpected team state for join: '+team.state);
+
+        var m = await this.lookup_member(teamid, member);
+        if (m !== null)
+            throw new Error('already have team member '+teamid+'/'+member);
+
+        await this.db.member_join(team.id, member, name, id, time);
+        delete team.members[member];
+    }
+
+    async part(teamid, member, time) {
+        throw new Error('TeamData.part() not implemented yet');
+    }
+
+    async chat(teamid, member, message, time) {
+        var team = await this.lookup(teamid);
+        if (!(team.state == 'active' || team.state == 'inactive'))
+            throw new Error('unexpected team state for chat: '+team.state);
+
+        var m = await this.lookup_member(teamid, member);
+        if (m === null)
+            throw new Error('unknown team member for chat: '+teamid+'/'+member);
+
+        await this.db.insert_chat(team.id, member, message, time);
     }
 
     active_teams_with_cursors() {
@@ -56,7 +137,8 @@ class TeamData {
     }
 
     static async init(db) {
-        return new this(db, await db.active_teams());
+        var teams =  await db.active_teams()
+        return new this(db, teams);
     }
 
     static add_team_cursors(teams, before) {
@@ -128,4 +210,45 @@ function copy_fields(input, fields) {
         output[field] = input[field];
     }
     return output;
+}
+
+function update_team_promise(db, teamid, team, warn_active=true) {
+    team.promise = db.team_by_teamid(teamid).then(t => {
+        delete team.promise;
+        if (t == null) {
+            team.state = 'unknown';
+            return team;
+        }
+        team.id = t.id;
+        if (t.started === null) {
+            team.state = 'starting';
+            return team;
+        }
+        if (t.finished !== null) {
+            team.state = 'inactive';
+            return team;
+        } else {
+            if (warn_active) {
+                console.warn('TeamData', 'unexpected active team in database');
+            }
+            team.state = 'active';
+            team.epoch = Date.parse(t.started);
+            team.team = t;
+            return team;
+        }
+    });
+    return team.promise;
+}
+
+function membercache(members) {
+    var cache = {};
+    members.forEach(m => {
+        cache[m.member_id] = {
+            joined: (m.joined !== null ? Date.parse(m.joined) : null),
+            parted: (m.parted !== null ? Date.parse(m.parted) : null),
+            last_location: m.last_location,
+            last_location_time: (typeof m.time == 'string' ? Date.parse(m.time) : null)
+        };
+    });
+    return cache;
 }
