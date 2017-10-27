@@ -30,6 +30,7 @@ db.connect()
         });
 
         msgqueue = new MsgQueue(teamdata, config.json_dir);
+        teamdata.on('push', teamdata_push);
     })
     .catch(err => {
         console.error(err);
@@ -69,6 +70,16 @@ function grant_access(conn) {
     conn.on('chat', message);
     conn.at('/teams', get_teams);
     conn.at(/^\/team\/([1-9][0-9]{0,8})\/chat/, get_team_chat);
+}
+
+function teamdata_push(path, data) {
+    console.log('teamdata_push', path, data);
+    wss.clients.forEach(ws => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        var conn = Connection.lookup(ws);
+        if (!conn || !conn.authenticated) return;
+        conn.push(path, data);
+    });
 }
 
 async function init_teamdata() {

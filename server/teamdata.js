@@ -4,6 +4,7 @@ class TeamData {
 
     constructor(db, active) {
         this.db = db;
+        this.handlers = {};
         this.map = new Map();
         this.active = active;
         active.forEach((team, index) => this.map.set(team.teamid, {
@@ -76,6 +77,8 @@ class TeamData {
         console.log('adding active team', team);
         this.active.push(team.team);
 
+        this.trigger('push', `/team/${team.id}`, TeamData.single_team_chat_cursors(team.team));
+
         done();
     }
 
@@ -83,6 +86,8 @@ class TeamData {
         var team = await this.lookup(teamid);
         if (!(team.state == 'active'))
             throw new Error('unexpected team state for end: '+team.state);
+
+        var tt = team.team;
 
         var done;
         team.state = 'pending';
@@ -95,6 +100,18 @@ class TeamData {
         }
 
         console.log('removing active team', team);
+
+        var idx = this.active.indexOf(tt);
+        if (idx < 0) {
+            console.error('could not find team in active team roster', teamid);
+        } else {
+            this.active.splice(idx, 1);
+        }
+
+        this.trigger('push', `/team/${team.id}`, {
+            data: {finished: new Date(time).toISOString()},
+            links: {'self': [`/team/${team.id}`, {fields: ['finished']}]}
+        });
 
         done();
     }
@@ -129,12 +146,15 @@ class TeamData {
             }
             islatest = (time > m.last_location_time);
         }
+
         var locid = await this.db.update_location(team.id, member, lat, lng, acc, time, islatest);
-        if (islatest) {
-            m.last_location = locid;
-            m.last_location_time = time;
-        }
-        if (islatest && team.state == 'active') {
+
+        if (!islatest) return;
+
+        m.last_location = locid;
+        m.last_location_time = time;
+
+        if (team.state == 'active') {
             let tm = team.team.members.find(mem => mem.member_id == member);
             if (tm) {
                 console.log('updating location for active team member '+teamid+'/'+member);
@@ -147,6 +167,13 @@ class TeamData {
                 });
             }
         }
+
+        this.trigger('push', `/team/${team.id}/member/${member}`, {
+            data: {lat: lat, lng: lng, accuracy: acc,
+                   time: new Date(time).toISOString()},
+            links: {'self': [`/team/${team.id}/member/${member}`,
+                             {fields: ['lat', 'lng', 'accuracy', 'time']}]}
+        });
     }
 
     async join(teamid, member, name, id, time) {
@@ -163,7 +190,7 @@ class TeamData {
 
         await this.db.member_join(team.id, member, name, id, time);
         await this.db.member_fix_last_location(team.id, member);
-        var m = await this.db.member_by_pos(team.id, member, (team.state == 'active'));
+        var m = await this.db.member_by_pos(team.id, member, true);
         if (m === null) {
             throw new Error('failed to join team member '+teamid+'/'+member);
             delete team.members[member];
@@ -177,6 +204,10 @@ class TeamData {
 
         delete team.members[member];
         Object.assign(team.members, cache);
+
+        this.trigger('push',
+            `/team/${team.id}/member/${member}`,
+            TeamData.team_member_chat_cursors(m, team.id));
 
         done();
     }
@@ -204,6 +235,12 @@ class TeamData {
         }
 
         delete team.members[member];
+
+        this.trigger('push', `/team/${team.id}/member/${member}`, {
+            data: {parted: new Date(time).toISOString()},
+            links: {'self': [`/team/${team.id}/member/${member}`,
+                             {fields: ['parted']}]}
+        });
 
         done();
     }
@@ -237,10 +274,28 @@ class TeamData {
                 team.team.chats[0] = chatobj;
             }
         }
+
+        this.trigger('push', `/team/${team.id}/chat/${chatid}`, {
+            data: {id: chatid,
+                   time: new Date(time).toISOString(),
+                   sender: member,
+                   message: message},
+            links: {'self': [`/team/${team.id}/chat/${chatid}`, {}]}
+        });
     }
 
     active_teams_with_cursors() {
         return TeamData.add_team_cursors(this.active);
+    }
+
+    on(ev, callback) {
+        this.handlers[ev] = callback;
+    }
+
+    trigger(ev, ...data) {
+        if (typeof this.handlers[ev] == 'function') {
+            this.handlers[ev](...data);
+        }
     }
 
     static async init(db) {
@@ -249,13 +304,8 @@ class TeamData {
     }
 
     static add_team_cursors(teams, before) {
-        var team_fields = ['id', 'name', 'started', 'finished'];
-        var member_fields = ['member_id', 'name', 'identity', 'joined', 'parted', 'lat', 'lng', 'accuracy', 'time'];
 
-        var out = {
-            data: [],
-            links: {}
-        };
+        var out = { data: [], links: {} };
 
         if (typeof before == 'string') {
             out.links['self'] = ['/teams', {before: before}];
@@ -267,15 +317,7 @@ class TeamData {
         }
 
         for (let team of teams) {
-            let oteam = copy_fields(team, team_fields);
-            oteam.members = [];
-            for (let member of team.members) {
-                oteam.members.push(copy_fields(member, member_fields));
-            }
-
-            oteam.chat = this.add_chat_cursors(team.chats, team.id);
-
-            out.data.push(oteam);
+            out.data.push(this.single_team_chat_cursors(team).data);
         }
 
         if (before && teams.length && !teams[teams.length-1].is_last_record) {
@@ -304,6 +346,35 @@ class TeamData {
         if (chats.length && !chats[chats.length-1].is_last_record) {
             out.links.older = ['/team/'+id+'/chat', {before: chats[chats.length-1].time}];
         }
+
+        return out;
+    }
+
+    static single_team_chat_cursors(team) {
+        var team_fields = ['id', 'name', 'started', 'finished'];
+
+        var oteam = copy_fields(team, team_fields);
+        oteam.members = [];
+        for (let member of team.members) {
+            oteam.members.push(this.team_member_chat_cursors(member, team.id).data);
+        }
+        oteam.chat = this.add_chat_cursors(team.chats, team.id);
+
+        var out = {
+            data: oteam,
+            links: {'self': [`/team/${team.id}`, {}]}
+        };
+
+        return out;
+    }
+
+    static team_member_chat_cursors(member, team) {
+        var member_fields = ['member_id', 'name', 'identity', 'joined', 'parted', 'lat', 'lng', 'accuracy', 'time'];
+
+        var out = {
+            data: copy_fields(member, member_fields),
+            links: {'self': [`/team/${team}/member/${member.member_id}`, {}]}
+        };
 
         return out;
     }

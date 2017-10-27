@@ -159,6 +159,10 @@ class Connection {
     error(...args) {
         console.error(this.id, ...args);
     }
+
+    static lookup(ws) {
+        return connmap.get(ws);
+    }
 }
 
 module.exports = Connection;
