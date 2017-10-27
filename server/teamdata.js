@@ -35,6 +35,9 @@ class TeamData {
 
     async lookup_member(teamid, member) {
         var team = await this.lookup(teamid);
+        if (team.members[member] instanceof Promise) {
+            await team.members[member];
+        }
         if (typeof team.members[member] == 'object') {
             return team.members[member];
         }
@@ -42,13 +45,16 @@ class TeamData {
             console.warn('Cannot lookup member of team with no ID in database', teamid+'/'+member);
             team.members[member] = null;
         } else {
+            let done;
+            team.members[member] = new Promise((resolve, reject) => { done = resolve; });
             let m = await this.db.member_by_pos(team.id, member);
             if (m === null) {
                 team.members[member] = null;
             } else {
                 let cache = membercache([m]);
-                team.members[member] = cache[0];
+                Object.assign(team.members, cache);
             }
+            done();
         }
         return team.members[member];
     }
@@ -67,8 +73,8 @@ class TeamData {
         if (team.state != 'active') {
             console.error('team not registered properly as started', teamid);
         }
+        console.log('adding active team', team);
         this.active.push(team.team);
-        console.log('started team', team);
         done(team);
     }
 
@@ -82,8 +88,12 @@ class TeamData {
             throw new Error('unexpected team state for add_location: '+team.state);
 
         var m = await this.lookup_member(teamid, member);
-        if (m === null)
-            throw new Error('unknown team member for add_location: '+teamid+'/'+member);
+        if (m === null) {
+            // unknown team member, just insert anyway
+            console.warn('add_location: unknown team member, inserting new location anyway');
+            await this.db.update_location(team.id, member, lat, lng, acc, time, false);
+            return;
+        }
 
         var islatest;
         if (m.last_location === null) {
@@ -118,8 +128,24 @@ class TeamData {
         if (m !== null)
             throw new Error('already have team member '+teamid+'/'+member);
 
+        var done;
+        team.members[member] = new Promise((resolve, reject) => { done = resolve; });
+
         await this.db.member_join(team.id, member, name, id, time);
+        await this.db.member_fix_last_location(team.id, member);
+        var m = await this.db.member_by_pos(team.id, member, (team.state == 'active'));
+        if (m === null) {
+            throw new Error('failed to join team member '+teamid+'/'+member);
+        }
+        if (team.state == 'active') {
+            console.log('adding member to active team roster', m);
+            team.team.members.push(m);
+        }
+        var cache = membercache([m]);
+
         delete team.members[member];
+        Object.assign(team.members, cache);
+        done();
     }
 
     async part(teamid, member, time) {

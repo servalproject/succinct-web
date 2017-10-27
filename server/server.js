@@ -1,5 +1,7 @@
 'use strict';
 
+process.on('unhandledRejection', r => console.log(r));
+
 const WebSocket = require('ws');
 
 const config = require('./config');

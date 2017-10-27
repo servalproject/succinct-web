@@ -70,11 +70,17 @@ class Db {
         console.log(res);
     }
 
-    async member_by_pos(id, member) {
+    async member_by_pos(id, member, loc=false) {
         if (!this.connected) {
             throw new Error('mysql not connected');
         }
-        var [members] = await this.execute('SELECT * FROM members WHERE team = ? AND member_id = ?', [id, member]);
+        var sql;
+        if (loc) {
+            sql = 'SELECT members.*, time, lat, lng, accuracy FROM members LEFT JOIN locations ON last_location = locations.id WHERE members.team = ? AND members.member_id = ?';
+        } else {
+            sql = 'SELECT * FROM members WHERE team = ? AND member_id = ?';
+        }
+        var [members] = await this.execute(sql, [id, member]);
         if (members.length == 0) return null;
         return to_normal_object(members[0]);
     }
@@ -86,7 +92,19 @@ class Db {
             [team, member, name, id, time/1000]);
     }
 
+    async member_fix_last_location(team, member) {
+        if (!this.connected) throw new Error('mysql not connected');
+        if (team < 0) throw new Error('invalid team id');
+        var [last] = await this.execute('SELECT id FROM locations WHERE team = ? AND member_id = ? ORDER BY time DESC LIMIT 1', [team, member]);
+        if (last.length) {
+            let locid = last[0].id;
+            await this.execute('UPDATE members SET last_location = ? WHERE team = ? AND member_id = ?', [locid, team, member]);
+        }
+    }
+
     async update_location(team, member, lat, lng, acc, time, islatest=false) {
+        if (!this.connected) throw new Error('mysql not connected');
+        if (team < 0) throw new Error('invalid team id');
         var [res] = await this.execute('INSERT IGNORE INTO locations (team, member_id, lat, lng, accuracy, time) VALUES (?, ?, ?, ?, ?, FROM_UNIXTIME(?))',
             [team, member, lat, lng, acc, time/1000]);
         var locid = res.insertId;
