@@ -80,7 +80,23 @@ class TeamData {
     }
 
     async end(teamid, time) {
-        throw new Error('TeamData.end() not implemented yet');
+        var team = await this.lookup(teamid);
+        if (!(team.state == 'active'))
+            throw new Error('unexpected team state for end: '+team.state);
+
+        var done;
+        team.state = 'pending';
+        team.promise = new Promise((resolve, reject) => { done = resolve; });
+        await this.db.team_end(team.id, time);
+
+        await update_team_promise(this.db, teamid, team);
+        if (team.state != 'inactive') {
+            console.error('team not registered properly as ended', teamid);
+        }
+
+        console.log('removing active team', team);
+
+        done();
     }
 
     async add_location(teamid, member, lat, lng, acc, time) {
@@ -317,6 +333,8 @@ function update_team_promise(db, teamid, team, warn_active=true, fill=false) {
         }
         if (t.finished !== null) {
             team.state = 'inactive';
+            team.epoch = Date.parse(t.started);
+            delete team.team;
             return team;
         } else {
             if (warn_active) {

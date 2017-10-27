@@ -65,9 +65,14 @@ class Db {
     }
 
     async team_start(teamid, name, time) {
-        var res = await this.execute('INSERT INTO teams (teamid, name, started) VALUES (?, ?, FROM_UNIXTIME(?)) ON DUPLICATE KEY UPDATE name=?, started=FROM_UNIXTIME(?)',
+        if (!this.connected) throw new Error('mysql not connected');
+        await this.execute('INSERT INTO teams (teamid, name, started) VALUES (?, ?, FROM_UNIXTIME(?)) ON DUPLICATE KEY UPDATE name=?, started=FROM_UNIXTIME(?)',
             [teamid, name, time/1000, name, time/1000]);
-        console.log(res);
+    }
+
+    async team_end(team, time) {
+        if (!this.connected) throw new Error('mysql not connected');
+        await this.execute('UPDATE teams SET finished = FROM_UNIXTIME(?) WHERE id = ?', [time/1000, team]);
     }
 
     async member_by_pos(id, member, loc=false) {
