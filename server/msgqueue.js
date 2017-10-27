@@ -169,7 +169,6 @@ class MsgQueue {
                 return;
             }
             console.log('got join', teamid+'/'+msg.member, msg.name, '('+msg.id+')');
-            console.log(msgtime);
             await this.teamdata.join(teamid, msg.member, msg.name, msg.id, msgtime);
             this.trigger('joined/'+teamid+'/'+msg.member);
             done();

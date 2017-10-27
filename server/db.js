@@ -92,6 +92,12 @@ class Db {
             [team, member, name, id, time/1000]);
     }
 
+    async member_part(team, member, time) {
+        if (!this.connected) throw new Error('mysql not connected');
+        if (team < 0) throw new Error('invalid team id');
+        await this.execute('UPDATE members SET parted = FROM_UNIXTIME(?) WHERE team = ? AND member_id = ?', [time/1000, team, member]);
+    }
+
     async member_fix_last_location(team, member) {
         if (!this.connected) throw new Error('mysql not connected');
         if (team < 0) throw new Error('invalid team id');

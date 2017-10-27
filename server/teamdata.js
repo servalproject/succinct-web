@@ -75,7 +75,8 @@ class TeamData {
         }
         console.log('adding active team', team);
         this.active.push(team.team);
-        done(team);
+
+        done();
     }
 
     async end(teamid, time) {
@@ -149,6 +150,8 @@ class TeamData {
         var m = await this.db.member_by_pos(team.id, member, (team.state == 'active'));
         if (m === null) {
             throw new Error('failed to join team member '+teamid+'/'+member);
+            delete team.members[member];
+            done();
         }
         if (team.state == 'active') {
             console.log('adding member to active team roster', m);
@@ -158,11 +161,35 @@ class TeamData {
 
         delete team.members[member];
         Object.assign(team.members, cache);
+
         done();
     }
 
     async part(teamid, member, time) {
-        throw new Error('TeamData.part() not implemented yet');
+        var team = await this.lookup(teamid);
+        if (!(team.state == 'active' || team.state == 'inactive'))
+            throw new Error('unexpected team state for part: '+team.state);
+
+        var m = await this.lookup_member(teamid, member);
+        if (m === null)
+            throw new Error('unknown team member for part: '+teamid+'/'+member);
+
+        var done;
+        team.members[member] = new Promise((resolve, reject) => { done = resolve; });
+
+        await this.db.member_part(team.id, member, time);
+
+        if (team.state == 'active') {
+            let tm = team.team.members.find(mem => mem.member_id == member);
+            if (tm) {
+                console.log('parting member from active team roster '+teamid+'/'+member);
+                tm.parted = new Date(time).toISOString();
+            }
+        }
+
+        delete team.members[member];
+
+        done();
     }
 
     async chat(teamid, member, message, time) {
