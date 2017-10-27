@@ -117,6 +117,19 @@ class TeamData {
             m.last_location = locid;
             m.last_location_time = time;
         }
+        if (islatest && team.state == 'active') {
+            let tm = team.team.members.find(mem => mem.member_id == member);
+            if (tm) {
+                console.log('updating location for active team member '+teamid+'/'+member);
+                Object.assign(tm, {
+                    last_location: locid,
+                    time: time,
+                    lat: lat,
+                    lng: lng,
+                    accuracy: acc
+                });
+            }
+        }
     }
 
     async join(teamid, member, name, id, time) {
@@ -161,7 +174,26 @@ class TeamData {
         if (m === null)
             throw new Error('unknown team member for chat: '+teamid+'/'+member);
 
-        await this.db.insert_chat(team.id, member, message, time);
+        var chatid = await this.db.insert_chat(team.id, member, message, time);
+
+        if (team.state == 'active') {
+            let chatobj = {
+                id: chatid,
+                team: teamid,
+                time: new Date(time).toISOString(),
+                sender: member,
+                message: message
+            };
+            console.log('inserting chat message into active team', chatobj);
+            if (team.team.chats.length && Date.parse(team.team.chats[0].time) == time) {
+                team.team.chats.unshift(chatobj);
+            } else if (team.team.chats.length && time < Date.parse(team.team.chats[0].time)) {
+                // ignore message in past
+            } else {
+                team.team.chats.length = 1;
+                team.team.chats[0] = chatobj;
+            }
+        }
     }
 
     active_teams_with_cursors() {
