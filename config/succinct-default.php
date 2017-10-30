@@ -63,7 +63,7 @@ class Succinct {
         $cmd = 'cd '.escapeshellcmd(dirname(self::REBUILD_MESSAGES))
             .' && '.escapeshellcmd(self::REBUILD_MESSAGES).' '.escapeshellcmd(self::SPOOL_DIR)
             .' '.escapeshellarg($team).' '.escapeshellarg($seq)
-            .' > '.escapeshellarg(self::ROOT . '/log/rebuild.log').' 2>&1';
+            .' >> '.escapeshellarg(self::ROOT . '/log/rebuild.log').' 2>&1';
         if ($background) {
             $cmd .= ' &';
         }
