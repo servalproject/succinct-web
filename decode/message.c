@@ -409,6 +409,74 @@ message_t parse_message(uint8_t *buf, unsigned int len) {
     return msg;
 }
 
+message_t new_chat_message(member_pos sender, rel_epoch epoch, char *message) {
+    message_t msg;
+    msg.info.type = MSG_TYPE_ERROR;
+    if (!message || message[0] == '\0') return msg;
+    if (strlen(message)+4 > MSG_MAX_PAYLOAD) {
+        warnx("%s: message is too long", __func__);
+        return msg;
+    }
+    if (!utf8_validate((uint8_t *) message)) {
+        warnx("%s: message is not valid utf8", __func__);
+        return msg;
+    }
+    message = strdup(message);
+    if (!message) {
+        warn("%s", __func__);
+        return msg;
+    }
+    msg.info.type = CHAT;
+    msg.info.length = strlen(message)+4;
+    msg.data.chat.member = sender;
+    msg.data.chat.time = epoch;
+    msg.data.chat.message = message;
+    return msg;
+}
+
+int write_message(FILE *out, message_t msg) {
+    // check msg validity
+    if (msg.info.type < 0 || msg.info.type > MSG_TYPE_MAX) return 0;
+    switch (msg.info.type) {
+        case CHAT:
+            if (!msg.data.chat.message) {
+                warnx("%s: chat message is null", __func__);
+                return 0;
+            } else if (strlen(msg.data.chat.message)+4 != msg.info.length) {
+                warnx("%s: chat message length does not match data", __func__);
+                return 0;
+            }
+            break;
+        default:
+            warnx("%s: unimplemented for message type (%d)", __func__, msg.info.type);
+            return 0;
+    }
+
+    unsigned int length = msg.info.length;
+    uint8_t *buf = malloc(length);
+    if (!buf) {
+        warn("%s", __func__);
+        return 0;
+    }
+
+    switch (msg.info.type) {
+        case CHAT:
+            buf[0] = msg.data.chat.member;
+            buf[1] = msg.data.chat.time >> 8;
+            buf[2] = msg.data.chat.time & 0xff;
+            memcpy(buf+3, msg.data.chat.message, length-3);
+            break;
+        default:
+            return 0;
+    }
+
+    if (fwrite(buf, 1, length, out) != length) {
+        warn("%s", __func__);
+        return 0;
+    }
+    return length;
+}
+
 void free_message(message_t msg) {
     switch (msg.info.type) {
         case TEAM_START:

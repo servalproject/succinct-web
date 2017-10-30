@@ -3,5 +3,6 @@
 /fragextract
 /fragwrite
 /message_to_json
+/chatmsg
 /*.o
 /ccan/json/*.o

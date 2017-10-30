@@ -8,6 +8,8 @@
 #define MSG_MAX_PAYLOAD UINT16_MAX
 #define MSG_MAXLEN (MSG_HDRLEN+MSG_MAX_PAYLOAD)
 
+#define REL_EPOCH_MAX UINT32_MAX
+
 enum msg_type {
     TEAM_START = 0,
     TEAM_END = 1,
@@ -103,6 +105,12 @@ long fragments_extract_message(uint32_t seq, int n, uint8_t *buf, int *span);
 
 /* (result).info.type negative on error */
 message_t parse_message(uint8_t *buf, unsigned int len);
+
+/* (result).info.type negative on error */
+message_t new_chat_message(member_pos sender, rel_epoch epoch, char *message);
+
+/* returns full length of message written, or 0 if error */
+int write_message(FILE *out, message_t msg);
 
 /* free any memory associated with msg */
 void free_message(message_t msg);
