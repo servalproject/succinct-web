@@ -443,7 +443,7 @@ int write_message(FILE *out, message_t msg) {
             if (!msg.data.chat.message) {
                 warnx("%s: chat message is null", __func__);
                 return 0;
-            } else if (strlen(msg.data.chat.message)+4 != msg.info.length) {
+            } else if (strlen(msg.data.chat.message)+6 != msg.info.length) {
                 warnx("%s: chat message length does not match data", __func__);
                 return 0;
             }
