@@ -50,6 +50,8 @@ try {
         API::uploadFragment($args);
     } else if ($cmd == 'ack') {
         API::ack($args);
+    } else if ($cmd == 'receiveFragment') {
+        API::receiveFragment($args);
     } else {
         throw new BadMethodCallException('unknown API command');
     }
@@ -163,7 +165,74 @@ class API {
         $teamid = strtolower($args[0]);
         // todo check if team is still valid?
 
+        Succinct::update_lastseen($teamid, 'http', $_SERVER['REMOTE_ADDR']);
         print_ack($teamid);
+    }
+
+    public static function receiveFragment($args) {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET')
+            throw new BadMethodCallException('receiveFragment must be a GET request');
+        if (count($args) != 2)
+            throw new BadMethodCallException('wrong number of arguments to receiveFragment');
+        if (!preg_match('/^[0-9a-f]{16}$/i', $args[0]))
+            throw new InvalidArgumentException('bad teamid in receiveFragment');
+        if (!preg_match('/^[0-9]{1,10}$/', $args[1]) || intval($args[1]) > 4294967295)
+            throw new InvalidArgumentException('bad sequence number in receiveFragment');
+
+        $team = strtolower($args[0]);
+        $seq = sprintf('%010d', intval($args[1]));
+
+        if (!is_dir(Succinct::SPOOL_DIR."/$team")) {
+            Succinct::logw(TAG, "receiveFragment for unknown team: $team");
+            http_response_code(404);
+            return;
+        }
+
+        $queuedir = Succinct::SPOOL_DIR."/$team/queue";
+
+        if (!silent_mkdir($queuedir))
+            throw new Exception("receiveFragment: unable to make $team/queue directory");
+
+        Succinct::update_lastseen($team, 'http', $_SERVER['REMOTE_ADDR']);
+
+        $lastfile = "$queuedir/last";
+
+        if (!file_exists($lastfile)) {
+            $last = -1;
+        } else {
+            $last = trim(@file_get_contents($lastfile));
+            if (!preg_match('/^[0-9]{10}$/', $last)) {
+                $last = -1;
+            }
+        }
+
+        $fragfile = "$queuedir/ready/$seq";
+
+        if ($last == -1 || intval($seq) > intval($last) || !file_exists($fragfile)) {
+            http_response_code(404);
+        } else {
+            Succinct::logi(TAG, "receiveFragment for $team/$seq");
+            header('Content-Type: application/octet-stream');
+            header('Content-Length: '.filesize($fragfile));
+            if (!@readfile($fragfile)) {
+                Succinct::loge(TAG, "receiveFragment: error while reading $fragfile: ".error_get_last()['message']);
+                return;
+            }
+        }
+
+        $lastreqfile = "$queuedir/lastreq";
+        if (!file_exists($lastreqfile)) {
+            $lastreq = -1;
+        } else {
+            $lastreq = trim(@file_get_contents($lastreqfile));
+            if (!preg_match('/^[0-9]{10}$/', $lastreq)) {
+                $lastreq = -1;
+            }
+        }
+
+        if (intval($seq) > intval($lastreq) && intval($seq) <= intval($last)+1) {
+            file_put_contents($lastreqfile, $seq);
+        }
     }
 }
 
@@ -180,5 +249,9 @@ function print_ack($team) {
         $ack = preg_replace('/^0+/', '', $ack);
     }
     echo $ack;
+}
+
+function silent_mkdir($dir) {
+    return (@mkdir($dir) || is_dir($dir));
 }
 ?>
