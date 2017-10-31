@@ -34,6 +34,10 @@ class TeamData {
         return update_team_promise(this.db, teamid, team);
     }
 
+    lookup_active_by_id(id) {
+        return this.active.find(team => (team.id === id));
+    }
+
     async lookup_member(teamid, member) {
         var team = await this.lookup(teamid);
         if (team.members[member] instanceof Promise) {
@@ -250,9 +254,11 @@ class TeamData {
         if (!(team.state == 'active' || team.state == 'inactive'))
             throw new Error('unexpected team state for chat: '+team.state);
 
-        var m = await this.lookup_member(teamid, member);
-        if (m === null)
-            throw new Error('unknown team member for chat: '+teamid+'/'+member);
+        if (member > 0) {
+            var m = await this.lookup_member(teamid, member);
+            if (m === null)
+                throw new Error('unknown team member for chat: '+teamid+'/'+member);
+        }
 
         var chatid = await this.db.insert_chat(team.id, member, message, time);
 

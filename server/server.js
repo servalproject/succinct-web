@@ -9,8 +9,10 @@ const Db = require('./db');
 const Connection = require('./connection');
 const TeamData = require('./teamdata');
 const MsgQueue = require('./msgqueue');
+const OutQueue = require('./outqueue');
 
 const db = new Db(config.mysql);
+const outqueue = new OutQueue(config.queue);
 
 var wss;
 var teamdata;
@@ -88,8 +90,42 @@ async function init_teamdata() {
 }
 
 async function message(data, conn) {
-    conn.warn('message() not implemented');
-    return false;
+    if (!Array.isArray(data) || data.length != 2) {
+        conn.warn('invalid input in chat message');
+        return false;
+    }
+    var id = data[0];
+    var msg = data[1];
+    if (!Number.isInteger(id)) {
+        conn.warn('invalid team id in chat message');
+        return false;
+    }
+    var team = teamdata.lookup_active_by_id(id);
+    if (!team) {
+        conn.warn(`got chat for unknown team ${id}`);
+        return ['fail', 'inactive or unknown team'];
+    }
+    if (typeof msg != 'string') {
+        conn.warn('got non-string data in chat message');
+        return false;
+    }
+    if (msg.length == 0) {
+        conn.warn('got empty chat message');
+        return false;
+    }
+    if (Buffer.byteLength(msg, 'utf8') > config.msg_max_bytes) {
+        return ['fail', 'message is too long'];
+    }
+    conn.log(`got message for team ${team.teamid}: ${msg}`);
+    var now = Math.round(Date.now()/100)*100;
+    try {
+        await outqueue.queue_chat(team.teamid, msg, now-Date.parse(team.started));
+        await teamdata.chat(team.teamid, 0, msg, now);
+        return true;
+    } catch (e) {
+        conn.warn('failed to queue chat message', e);
+        return false;
+    }
 }
 
 async function get_teams(options, conn) {

@@ -336,6 +336,15 @@ function show_chat(id, memberid) {
     chatbox.data('teamid', ''+id);
     chatbox.show();
     scroll_to_bottom(chatlog);
+
+    var send = $('#send');
+    var msg = $('#msg');
+
+    msg.val('');
+
+    send.click(function () {
+        send_chat_message(id, msg);
+    });
 }
 
 function insert_chat_node(chat, tid, lastid) {
@@ -462,6 +471,28 @@ function get_older_chats(tid) {
     teams[tid].loading = true;
     get(socket, teams[tid].chatlinks.older[0], teams[tid].chatlinks.older[1], function (s,d) {new_chat_messages(s, d, tid);});
     console.log('loading more chats', tid, teams[tid].chatlinks.older[0], teams[tid].chatlinks.older[1]);
+}
+
+function send_chat_message(tid, input) {
+    var msg = input.val();
+    if (typeof msg != 'string' || msg == '') return false;
+    if (input.prop('disabled')) return false;
+
+    input.prop('disabled', true);
+    console.debug('sending chat message', tid, msg);
+    rpc(socket, 'chat', [tid, msg], function (s, data) {
+        console.log(s, data);
+        input.prop('disabled', false);
+        if (s == 'ok') {
+            console.debug('send chat message ok');
+            input.val('');
+        } else {
+            // todo do this more nicely
+            console.debug('send chat message failed');
+            alert('could not send message at this time');
+        }
+    });
+    return true;
 }
 
 function new_chat_messages(s, chats, tid) {

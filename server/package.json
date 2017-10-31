@@ -13,6 +13,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "mysql2": "^1.4.2",
+    "shell-escape": "^0.2.0",
     "ws": "^3.2.0"
   }
 }
