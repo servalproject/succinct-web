@@ -427,7 +427,7 @@ message_t new_chat_message(member_pos sender, rel_epoch epoch, char *message) {
         return msg;
     }
     msg.info.type = CHAT;
-    msg.info.length = strlen(message)+4;
+    msg.info.length = strlen(message)+6;
     msg.data.chat.member = sender;
     msg.data.chat.time = epoch;
     msg.data.chat.message = message;
@@ -470,9 +470,11 @@ int write_message(FILE *out, message_t msg) {
     switch (msg.info.type) {
         case CHAT:
             buf[offset+0] = msg.data.chat.member;
-            buf[offset+1] = msg.data.chat.time >> 8;
-            buf[offset+2] = msg.data.chat.time & 0xff;
-            memcpy(buf+offset+3, msg.data.chat.message, msg.info.length-3);
+            buf[offset+1] = (msg.data.chat.time >> 24) & 0xff;
+            buf[offset+2] = (msg.data.chat.time >> 16) & 0xff;
+            buf[offset+3] = (msg.data.chat.time >>  8) & 0xff;
+            buf[offset+4] = (msg.data.chat.time >>  0) & 0xff;
+            memcpy(buf+offset+5, msg.data.chat.message, msg.info.length-5);
             break;
         default:
             free(buf);
