@@ -13,16 +13,15 @@ static uint8_t msgbuf[MSG_MAXLEN+1];
 static void write_fragment_header(FILE *fp, uint8_t *teamid, uint32_t seq, uint8_t offset);
 
 int main(int argc, char *argv[]) {
-    if (argc != 7) {
-        fprintf(stderr, "Usage: fragwrite dir teamid seqstart mtu msgtype msgfile\n");
+    if (argc != 6) {
+        fprintf(stderr, "Usage: fragwrite dir teamid seqstart mtu msgfile\n");
         return 2;
     }
     char *dir = argv[1];
     char *team = argv[2];
     char *seqstart = argv[3];
     char *mtu_s = argv[4];
-    char *msgtype_s = argv[5];
-    char *msgfilename = argv[6];
+    char *msgfilename = argv[5];
 
     FILE *msgfile = fopen(msgfilename, "r");
     if (!msgfile) err(1, "%s", msgfilename);
@@ -52,27 +51,18 @@ int main(int argc, char *argv[]) {
     if (mtu_s[0] == '\0') errx(1, "empty mtu");
     char *end = NULL;
     long int mtu = strtol(mtu_s, &end, 10);
-    if (end[0] != '\0' || mtu <= FRAGHDRLEN || mtu > UINT16_MAX) {
+    if (end[0] != '\0' || (mtu <= FRAGHDRLEN && mtu != -1) || mtu > UINT16_MAX) {
         errx(1, "%s: invalid mtu or out of range", mtu_s);
     }
 
-    if (msgtype_s[0] == '\0') errx(1, "empty message type");
-    end = NULL;
-    long int msgtype = strtol(msgtype_s, &end, 10);
-    if (end[0] != '\0' || msgtype < 0 || msgtype > MSG_TYPE_MAX) {
-        errx(1, "%s: invalid message type", msgtype_s);
-    }
-
-    size_t payload = fread(msgbuf+MSG_HDRLEN, 1, MSG_MAX_PAYLOAD+1, msgfile);
+    size_t payload = fread(msgbuf, 1, MSG_MAXLEN+1, msgfile);
     if (ferror(msgfile)) err(1, "%s", msgfilename);
-    if (payload == 0) warnx("warning: %s: message has zero length", msgfilename);
-    if (payload > MSG_MAX_PAYLOAD) errx(1, "%s: message too long", msgfilename);
+    if (payload < MSG_HDRLEN) errx(1, "%s: message too short", msgfilename);
+    if (payload > MSG_MAXLEN) errx(1, "%s: message too long", msgfilename);
     fclose(msgfile);
 
-    msgbuf[0] = msgtype;
-    msgbuf[1] = payload >> 8;
-    msgbuf[2] = payload & 0xff;
-    long int msglen = MSG_HDRLEN + payload;
+    if ((msgbuf[1] << 8) + msgbuf[2] != payload-3)
+        errx(1, "%s: message length does not match payload", msgfilename);
 
     /* ensure next sequence number is free */
     while (1) {
@@ -100,7 +90,7 @@ int main(int argc, char *argv[]) {
         rawoffset = -1;
     }
 
-    while (rawoffset == 255 || len >= mtu) {
+    while (rawoffset == 255 || (mtu != -1 && len >= mtu) || (mtu == -1 && len > 0)) {
         fclose(fragment);
         free(seqstr);
         if (seq == UINT32_MAX) errx(1, "hit maximum sequence number");
@@ -129,13 +119,13 @@ int main(int argc, char *argv[]) {
         write_fragment_header(fragment, teamid, seq, offset);
     }
 
-    int remaining = msglen;
-    int available = mtu-len;
+    int remaining = payload;
+    int available = (mtu == -1) ? remaining : (mtu-len);
 
     while (1) {
         int towrite = (remaining < available) ? remaining : available;
         fprintf(stderr, "info: writing %d bytes to %s\n", towrite, seqstr);
-        if (fwrite(msgbuf+(msglen-remaining), 1, towrite, fragment) != towrite) {
+        if (fwrite(msgbuf+(payload-remaining), 1, towrite, fragment) != towrite) {
             err(1, "%s", seqstr);
         }
         remaining -= towrite;

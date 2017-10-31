@@ -436,6 +436,7 @@ message_t new_chat_message(member_pos sender, rel_epoch epoch, char *message) {
 
 int write_message(FILE *out, message_t msg) {
     // check msg validity
+    if (!out) return 0;
     if (msg.info.type < 0 || msg.info.type > MSG_TYPE_MAX) return 0;
     switch (msg.info.type) {
         case CHAT:
@@ -452,29 +453,61 @@ int write_message(FILE *out, message_t msg) {
             return 0;
     }
 
-    unsigned int length = msg.info.length;
+    unsigned int length = msg.info.length+MSG_HDRLEN;
     uint8_t *buf = malloc(length);
     if (!buf) {
         warn("%s", __func__);
         return 0;
     }
 
+    // write message header first
+    buf[0] = msg.info.type;
+    buf[1] = msg.info.length >> 8;
+    buf[2] = msg.info.length & 0xff;
+
+    int offset = MSG_HDRLEN;
+
     switch (msg.info.type) {
         case CHAT:
-            buf[0] = msg.data.chat.member;
-            buf[1] = msg.data.chat.time >> 8;
-            buf[2] = msg.data.chat.time & 0xff;
-            memcpy(buf+3, msg.data.chat.message, length-3);
+            buf[offset+0] = msg.data.chat.member;
+            buf[offset+1] = msg.data.chat.time >> 8;
+            buf[offset+2] = msg.data.chat.time & 0xff;
+            memcpy(buf+offset+3, msg.data.chat.message, msg.info.length-3);
             break;
         default:
+            free(buf);
             return 0;
     }
 
     if (fwrite(buf, 1, length, out) != length) {
         warn("%s", __func__);
+        free(buf);
         return 0;
     }
+    free(buf);
     return length;
+}
+
+int write_message_raw(FILE *out, enum msg_type type, uint8_t *buf, unsigned int len) {
+    if (!out) return 0;
+    if (type < 0 || type > MSG_TYPE_MAX) return 0;
+    if (len > 0 && !buf) return 0;
+    if (len > MSG_MAX_PAYLOAD) return 0;
+
+    uint8_t hdr[3];
+    hdr[0] = type;
+    hdr[1] = len >> 8;
+    hdr[2] = len & 0xff;
+
+    if (fwrite(hdr, 1, 3, out) != 3) {
+        warn("%s", __func__);
+        return 0;
+    }
+    if (fwrite(buf, 1, len, out) != len) {
+        warn("%s", __func__);
+        return 0;
+    }
+    return len+3;
 }
 
 void free_message(message_t msg) {

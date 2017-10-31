@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-Wall -pedantic -std=gnu11
 
-all: place_fragment fraginfo fragextract fragwrite message_to_json chatmsg
+all: place_fragment fraginfo fragextract fragwrite message_to_json msgwrite
 
 place_fragment: decode.o fragment.o place_fragment.c
 	$(CC) -o $@ $^ $(CFLAGS) $(CPPFLAGS)
@@ -18,5 +18,5 @@ fragwrite: fragment.o message.o fragwrite.c
 message_to_json: message.o fragment.o ccan/json/json.o message_to_json.c
 	$(CC) -o $@ $^ $(CLFAGS) $(CPPFLAGS)
 
-chatmsg: message.o fragment.o chatmsg.c
+msgwrite: message.o fragment.o msgwrite.c
 	$(CC) -o $@ $^ $(CLFAGS) $(CPPFLAGS)

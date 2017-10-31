@@ -50,9 +50,10 @@ for ((i=0; i<MESSAGES; i++)); do
     if ((payloadsize>0)); then
         dd if=/dev/urandom status=none bs=$payloadsize count=1 >> test/original/$msgfile
         dd if=test/original/$msgfile status=none skip=3 iflag=skip_bytes bs=$payloadsize count=1 \
-            | ./fragwrite test/fragments $teamid 0 $mtu $msgtype /dev/stdin
+            | ./msgwrite raw $msgtype /dev/stdin \
+            | ./fragwrite test/fragments $teamid 0 $mtu /dev/stdin
     else
-        ./fragwrite test/fragments $teamid 0 $mtu $msgtype /dev/null
+        ./msgwrite raw $msgtype /dev/null | ./fragwrite test/fragments $teamid 0 $mtu /dev/stdin
     fi
 done
 

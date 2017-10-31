@@ -112,6 +112,9 @@ message_t new_chat_message(member_pos sender, rel_epoch epoch, char *message);
 /* returns full length of message written, or 0 if error */
 int write_message(FILE *out, message_t msg);
 
+/* returns full length of message written, or 0 if error */
+int write_message_raw(FILE *out, enum msg_type type, uint8_t *buf, unsigned int len);
+
 /* free any memory associated with msg */
 void free_message(message_t msg);
 
