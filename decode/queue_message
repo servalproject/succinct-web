@@ -1,0 +1,65 @@
+#!/bin/bash
+
+if [ $# -ne 3 ]; then
+    echo "Usage: $0 dir team msgfile"
+    exit 2
+fi
+
+dir="$1"
+team="$2"
+msgfile="$3"
+
+function error_exit {
+    echo "$1" >&2
+    exit "${2:-1}"
+}
+
+command -v flock >/dev/null 2>&1 || error_exit "$0 requires flock"
+command -v ./fragwrite >/dev/null 2>&1 || error_exit "$0 requires ./fragwrite"
+FRAGWRITE=$(realpath ./fragwrite)
+
+[ -n "$dir" ] || error_exit "must specify root directory"
+[[ $team =~ ^[0-9a-f]{16}$ ]] || error_exit "$team: invalid team identifier"
+[ -e "$msgfile" ] || error_exit "$msgfile: file does not exist"
+
+cd "$dir" || exit 1
+
+mkdir -p "$team/queue" || exit 1
+
+# obtain lock on team directory
+exec 200<"$team/queue" || error_exit "$team/queue: file descriptor could not be opened for reading"
+flock 200 || error_exit "$team/queue: unable to obtain lock"
+
+mkdir -p "$team/queue/tmp" || exit 1
+mkdir -p "$team/queue/ready" || exit 1
+
+function nextseq {
+    local seq=$((10#$1))
+    printf "%010d\n" $((seq+1))
+}
+
+if [ -f "$team/queue/last" ]; then
+    read last < "$team/queue/last"
+    if [ $? -ne 0 ] || [ -z "$last" ]; then
+        last=-1
+    fi
+else
+    last=-1
+fi
+
+((10#$last==4294967295)) && error_exit "hit maximum sequence number $team/queue/$last"
+
+next="$(nextseq "$last")"
+[ -e "$team/queue/ready/$next" ] && error_exit "$team/queue/ready/$next: already exists"
+
+rm -f "$team/queue/tmp/$next"
+"$FRAGWRITE" "$team/queue/tmp" "$team" "$next" -1 "$msgfile"
+
+if [ $? -ne 0 ]; then
+    rm -f "$team/queue/tmp/$next"
+    error_exit "failed to write fragment $team/queue/tmp/$next"
+fi
+
+mv "$team/queue/tmp/$next" "$team/queue/ready/$next" || exit 1
+
+echo "$next" > "$team/queue/last"
