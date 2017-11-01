@@ -481,7 +481,6 @@ function send_chat_message(tid, input) {
     input.prop('disabled', true);
     console.debug('sending chat message', tid, msg);
     rpc(socket, 'chat', [tid, msg], function (s, data) {
-        console.log(s, data);
         input.prop('disabled', false);
         if (s == 'ok') {
             console.debug('send chat message ok');
@@ -685,8 +684,18 @@ function handle_push(json) {
         return;
     }
 
+    var m;
+
     if (path == '/teams') {
         new_teams(data);
+    } else if ((m = path.match(/^\/team\/([0-9]+)$/))) {
+        console.log('team data pushed', m[1], data);
+    } else if ((m = path.match(/^\/team\/([0-9]+)\/member\/([0-9]+)$/))) {
+        console.log('member data pushed', m[1], m[2], data);
+    } else if ((m = path.match(/^\/team\/([0-9]+)\/chat\/([0-9]+)$/))) {
+        console.log('chat data pushed', m[1], m[2], data);
+    } else {
+        console.error('unhandled push for path:', path, data);
     }
 }
 
