@@ -103,6 +103,7 @@ function new_teams(t) {
         for (var key in team) {
             if (!team.hasOwnProperty(key)) continue;
             if (key == 'id') continue;
+            if (key == 'links') continue;
             if (key == 'chat' || key == 'members') {
                 // handle after this loop
                 continue;
@@ -121,7 +122,11 @@ function new_teams(t) {
         if ('members' in team) {
             var members = team['members'];
             for (var j=0; j<members.length; j++) {
-                new_member(id, members[j]);
+                if (typeof members[j].joined == 'undefined') {
+                    update_member(id, members[j]);
+                } else {
+                    new_member(id, members[j]);
+                }
             }
         }
         if ('chat' in team) {
@@ -169,7 +174,6 @@ function new_member(tid, member) {
     if (member.time)   member.time   = new Date(member.time);
 
     console.log('new member', tid, member);
-
     append_sorted(teams[tid].members, member, cmp_member);
 
     if (member.joined) {
@@ -179,19 +183,58 @@ function new_member(tid, member) {
         new_chat(tid, {type: Chat.TYPE_PART, time: new Date(member.parted), sender: member.member_id, id: 'part-'+member.member_id});
     }
 
-    // todo update UI if necessary
-
     if (member.time && member.parted === null) {
         // have location and should show on map
-        member.marker = L.marker([member.lat, member.lng]);
-        var tooltip = function () {
-            var timehtml = '<time class="abbreviated" datetime="'+member.time.toISOString()+'">' + elapsed(member.time) + '</time>';
-            return member.name + ' (<b>' + teams[tid].name + '</b>, ' + timehtml +  ')';
-        };
-        member.marker.bindTooltip(tooltip);
-        member.marker.on('click', function() { show_chat(tid, member_id); });
-        member.marker.addTo(teams[tid].layergroup);
+        update_location(tid, member);
     }
+}
+
+function update_member(tid, update) {
+    var member_id = update.member_id;
+
+    var member = teams[tid].members.find(function (m) { return m.member_id == member_id; });
+    if (typeof member == 'undefined') {
+        console.warn('update_member: member not found', tid, member_id);
+        return
+    }
+
+    if (update.joined) {
+        console.warn('update_member: unexpected joined field in update', tid, update);
+        return
+    }
+    if (update.parted) update.parted = new Date(update.parted);
+    if (update.time)   update.time   = new Date(update.time);
+
+    console.log('update member', tid, update);
+    $.extend(member, update);
+
+    if (update.parted) {
+        new_chat(tid, {type: Chat.TYPE_PART, time: new Date(member.parted), sender: member.member_id, id: 'part-'+member.member_id});
+    }
+
+    if (update.time && member.parted === null) {
+        // have location and should show on map
+        update_location(tid, member);
+    }
+}
+
+function update_location(tid, member) {
+    var member_id = member.member_id;
+
+    if (member.marker) {
+        member.marker.setLatLng([member.lat, member.lng]);
+        return
+    }
+
+    // first location for member, create new marker
+    member.marker = L.marker([member.lat, member.lng]);
+    var tooltip = function () {
+        var timehtml = '<time class="abbreviated" datetime="'+member.time.toISOString()+'">' + elapsed(member.time) + '</time>';
+        return member.name + ' (<b>' + teams[tid].name + '</b>, ' + timehtml +  ')';
+    };
+    member.marker.bindTooltip(tooltip);
+    member.marker.on('click', function() { show_chat(tid, member_id); });
+    member.marker.addTo(teams[tid].layergroup);
 }
 
 function team_update_order(id) {
@@ -270,6 +313,7 @@ function team_ui(id) {
         }
     }
     var pos = teamorder.indexOf(id);
+    node.off("click");
     node.click(function() { show_chat(id); });
     if (pos < 0) {
         console.error('id not found in teamorder');
@@ -604,7 +648,6 @@ function cmp_member(a, b) {
 }
 
 function cmp_team(a, b) {
-    console.log('comparing teams', a, b);
     // finished teams appear last
     if (a.finished === null && b.finished !== null) {
         return -1;
@@ -690,10 +733,16 @@ function handle_push(json) {
         new_teams(data);
     } else if ((m = path.match(/^\/team\/([0-9]+)$/))) {
         console.log('team data pushed', m[1], data);
+        var teamdata = {data: [$.extend({id: parseInt(m[1])}, data.data)]};
+        new_teams(teamdata);
     } else if ((m = path.match(/^\/team\/([0-9]+)\/member\/([0-9]+)$/))) {
         console.log('member data pushed', m[1], m[2], data);
+        var teamdata = {data: [{id: parseInt(m[1]), members: [$.extend({}, data.data, {member_id: parseInt(m[2])})]}]};
+        new_teams(teamdata);
     } else if ((m = path.match(/^\/team\/([0-9]+)\/chat\/([0-9]+)$/))) {
         console.log('chat data pushed', m[1], m[2], data);
+        var teamdata = {data: [{id: parseInt(m[1]), chat: {data: [data.data]}}]};
+        new_teams(teamdata);
     } else {
         console.error('unhandled push for path:', path, data);
     }
