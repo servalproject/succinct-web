@@ -114,7 +114,7 @@ function new_teams(t) {
                 chat.type = (key == 'started') ? Chat.TYPE_START : Chat.TYPE_FINISH;
                 chat.id = key;
                 chat.time = new Date(teams[id][key]);
-                new_chat(id, chat);
+                new_chat_message(id, chat);
                 continue;
             }
             teams[id][key] = team[key];
@@ -131,14 +131,7 @@ function new_teams(t) {
         }
         if ('chat' in team) {
             var chats = team['chat'];
-            if (chats.links) {
-                teams[id].chatlinks = chats.links;
-            }
-            for (var j=0; j<chats.data.length; j++) {
-                var chat = chats.data[j];
-                chat.type = Chat.TYPE_MESSAGE;
-                new_chat(id, chat);
-            }
+            new_chat_messages('ok', chats, id);
         }
         if (!newteam) {
             teams[id].lastpush = now;
@@ -177,10 +170,10 @@ function new_member(tid, member) {
     append_sorted(teams[tid].members, member, cmp_member);
 
     if (member.joined) {
-        new_chat(tid, {type: Chat.TYPE_JOIN, time: new Date(member.joined), sender: member.member_id, id: 'join-'+member.member_id});
+        new_chat_message(tid, {type: Chat.TYPE_JOIN, time: new Date(member.joined), sender: member.member_id, id: 'join-'+member.member_id});
     }
     if (member.parted) {
-        new_chat(tid, {type: Chat.TYPE_PART, time: new Date(member.parted), sender: member.member_id, id: 'part-'+member.member_id});
+        new_chat_message(tid, {type: Chat.TYPE_PART, time: new Date(member.parted), sender: member.member_id, id: 'part-'+member.member_id});
     }
 
     if (member.time && member.parted === null) {
@@ -209,7 +202,7 @@ function update_member(tid, update) {
     $.extend(member, update);
 
     if (update.parted) {
-        new_chat(tid, {type: Chat.TYPE_PART, time: new Date(member.parted), sender: member.member_id, id: 'part-'+member.member_id});
+        new_chat_message(tid, {type: Chat.TYPE_PART, time: new Date(member.parted), sender: member.member_id, id: 'part-'+member.member_id});
     }
 
     if (update.time && member.parted === null) {
@@ -545,7 +538,7 @@ function new_chat_messages(s, chats, tid) {
         return;
     }
 
-    var hadall = (typeof teams[tid].chatlinks.older == 'undefined');
+    var hadall = teams[tid].chatlinks && (typeof teams[tid].chatlinks.older == 'undefined');
 
     var first_shown = -1;
     if (hadall && teams[tid].chats.length > 0) {
@@ -563,7 +556,7 @@ function new_chat_messages(s, chats, tid) {
     var inserted = [];
     for (var i=0; i<chats.data.length; i++) {
         var chat = chats.data[i];
-        chat.type = Chat.TYPE_MESSAGE;
+        if (typeof chat.type == 'undefined') chat.type = Chat.TYPE_MESSAGE;
         var pos = new_chat(tid, chat);
 
         if (first_shown >= 0 && pos <= first_shown) first_shown++;
@@ -572,6 +565,8 @@ function new_chat_messages(s, chats, tid) {
         }
         inserted.push(pos);
     }
+
+    // FIXME split out UI handling
 
     // UI changes
 
@@ -613,6 +608,10 @@ function new_chat_messages(s, chats, tid) {
         setTimeout(function () {scroll_to_bottom(chatlog);}, 50);
     }
     setTimeout(function () { teams[tid].loading = false; check_chat_loader(); }, 500);
+}
+
+function new_chat_message(tid, chat) {
+    new_chat_messages('ok', {data: [chat]}, tid);
 }
 
 function cmp_chat(a, b) {
