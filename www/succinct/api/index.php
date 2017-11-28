@@ -246,7 +246,7 @@ class API {
             throw new BadMethodCallException('haveForm must be a GET request');
         if (count($args) != 1)
             throw new BadMethodCallException('wrong number of arguments to haveForm');
-        if (!preg_match('/^[0-9a-f]{16}$/i', $args[0]))
+        if (!preg_match('/^[0-9a-f]{12}$/i', $args[0]))
             throw new InvalidArgumentException('bad form hash in haveForm');
 
         $hash = strtolower($args[0]);
@@ -268,7 +268,7 @@ class API {
             throw new LengthException('uploadForm: specified Content-Length is out of valid bounds');
         if (count($args) != 1)
             throw new BadMethodCallException('wrong number of arguments to uploadForm');
-        if (!preg_match('/^[0-9a-f]{16}$/i', $args[0]))
+        if (!preg_match('/^[0-9a-f]{12}$/i', $args[0]))
             throw new InvalidArgumentException('bad form hash in uploadForm');
 
         $hash = strtolower($args[0]);
