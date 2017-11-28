@@ -278,6 +278,9 @@ class API {
             return;
         }
 
+        if (!silent_mkdir(Succinct::MAGPI_FORMS_DIR) || !silent_mkdir(Succinct::MAGPI_FORMS_DIR."/$hash"))
+            throw new Exception("receiveForm: unable to make magpi/$hash directory");
+
         $post = fopen('php://input', 'r');
         if (!$post) throw new Exception('uploadForm: could not open POST input');
 
