@@ -79,7 +79,7 @@ class Succinct {
         if (!mkdir($tmpdir))
             return false; // throw new Exception('install_magpi_recipe: mkdir failed');
 
-        $cmd = 'cd '.escapeshellarg(dirname(self::SMAC_RECIPE))
+        $cmd = 'cd '.escapeshellarg(dirname(self::SMAC))
             .' && '.escapeshellarg(self::SMAC).' recipe xhcreate'
             .' '.escapeshellarg($tmpdir).' '.escapeshellarg($tmpfile)
             .' >> '.escapeshellarg(self::ROOT . '/log/smac.log').' 2>&1';
