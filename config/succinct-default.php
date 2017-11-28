@@ -102,7 +102,7 @@ class Succinct {
             return false; // throw new Exception('install_magpi_recipe: expected two files in magpi recipe output');
         }
 
-        if (!rename($tmpdir, self::MAGPI_FORMS_DIR . "$hash/recipe")) {
+        if (!rename($tmpdir, self::MAGPI_FORMS_DIR . "/$hash/recipe")) {
             shell_exec('rm -rf '.escapeshellarg($tmpdir));
             return false; // throw new Exception('install_magpi_recipe: rename recipe directory failed');
         }
