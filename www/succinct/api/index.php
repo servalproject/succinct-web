@@ -250,8 +250,8 @@ class API {
             throw new InvalidArgumentException('bad form hash in haveForm');
 
         $hash = strtolower($args[0]);
-        // FIXME implement
-        echo 'false';
+
+        echo is_dir(Succinct::MAGPI_FORMS_DIR . "/$hash/recipe") ? "true" : "false";
     }
 
     public static function uploadForm($args) {
@@ -272,6 +272,11 @@ class API {
             throw new InvalidArgumentException('bad form hash in uploadForm');
 
         $hash = strtolower($args[0]);
+
+        if (is_dir(Succinct::MAGPI_FORMS_DIR . "/$hash/recipe")) {
+            // already have recipe
+            return;
+        }
 
         $post = fopen('php://input', 'r');
         if (!$post) throw new Exception('uploadForm: could not open POST input');
@@ -300,7 +305,12 @@ class API {
             throw new Exception("could not write to temporary file $tmp");
         }
 
-        // FIXME move form to correct place
+        if (!Succinct::install_magpi_recipe($hash, $tmp)) {
+            unlink($tmp);
+            throw new Exception("could not install magpi recipe with hash $hash");
+        }
+
+        Succinct::logi(TAG, "receiveForm installed magpi recipe $hash");
     }
 }
 

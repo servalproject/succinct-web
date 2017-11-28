@@ -32,9 +32,12 @@ class Succinct {
     const FRAGINFO = self::ROOT . '/decode/fraginfo';
     const PLACE_FRAGMENT = self::ROOT . '/decode/place_fragment';
     const REBUILD_MESSAGES = self::ROOT . '/decode/rebuild_messages';
+    const SMAC = self::ROOT . '/smac/smac';
 
     const SPOOL_DIR = self::ROOT . '/spool';
     const TMP_DIR = self::SPOOL_DIR . '/tmp';
+
+    const MAGPI_FORMS_DIR = self::SPOOL_DIR . '/magpi';
 
     // below here is not configuration but is a useful place to put helper functions
     // and global initialisation code rather than including another file
@@ -69,6 +72,42 @@ class Succinct {
         }
         $out = exec($cmd, $outa, $ret);
         return ($ret == 0);
+    }
+
+    public static function install_magpi_recipe($hash, $tmpfile) {
+        $tmpdir = "$tmpfile.outdir";
+        if (!mkdir($tmpdir))
+            return false; // throw new Exception('install_magpi_recipe: mkdir failed');
+
+        $cmd = 'cd '.escapeshellarg(dirname(self::SMAC_RECIPE))
+            .' && '.escapeshellarg(self::SMAC).' recipe xhcreate'
+            .' '.escapeshellarg($tmpdir).' '.escapeshellarg($tmpfile)
+            .' >> '.escapeshellarg(self::ROOT . '/log/smac.log').' 2>&1';
+
+        $out = exec($cmd, $outa, $ret);
+        if ($ret != 0) {
+            shell_exec('rm -rf '.escapeshellarg($tmpdir));
+            return false;
+        }
+
+        $entries = scandir($tmpdir);
+        if ($entries === false) {
+            shell_exec('rm -rf '.escapeshellarg($tmpdir));
+            return false; // throw new Exception('install_magpi_recipe: could not read temporary directory');
+        }
+        $files = array_diff($entries, ['.', '..']);
+
+        if (count($files) != 2) {
+            shell_exec('rm -rf '.escapeshellarg($tmpdir));
+            return false; // throw new Exception('install_magpi_recipe: expected two files in magpi recipe output');
+        }
+
+        if (!rename($tmpdir, self::MAGPI_FORMS_DIR . "$hash/recipe")) {
+            shell_exec('rm -rf '.escapeshellarg($tmpdir));
+            return false; // throw new Exception('install_magpi_recipe: rename recipe directory failed');
+        }
+
+        return true;
     }
 
     private static function db_connect() {
