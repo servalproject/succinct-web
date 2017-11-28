@@ -7,6 +7,7 @@ ignore_user_abort(true);
 const TAG = 'Direct';
 const MIN_FRAGMENT_SIZE = 13;
 const MAX_FRAGMENT_SIZE = 65535;
+const MAX_FORM_SIZE = 1048576;
 
 if (!defined('Succinct::DIRECT_API_KEY')) {
     http_response_code(500);
@@ -52,8 +53,13 @@ try {
         API::ack($args);
     } else if ($cmd == 'receiveFragment') {
         API::receiveFragment($args);
+    } else if ($cmd == 'haveForm') {
+        API::haveForm($args);
+    } else if ($cmd == 'uploadForm') {
+        API::uploadForm($args);
     } else {
-        throw new BadMethodCallException('unknown API command');
+        $cmdstr = preg_match('#^[a-zA-Z0-9_-]+$#', $cmd) ? " ($cmd)" : "";
+        throw new BadMethodCallException("unknown API command".$cmdstr);
     }
 } catch (BadMethodCallException $e) {
     http_response_code(400);
@@ -114,7 +120,7 @@ class API {
 
         fclose($post);
 
-        $tmp = tempnam(Succinct::TMP_DIR, 'textmagic_fragment');
+        $tmp = tempnam(Succinct::TMP_DIR, 'direct_fragment');
         if ($tmp === false) throw new Exception('could not create temporary file');
 
         if (file_put_contents($tmp, $fragment) === false) {
@@ -233,6 +239,68 @@ class API {
         if (intval($seq) > intval($lastreq) && intval($seq) <= intval($last)+1) {
             file_put_contents($lastreqfile, $seq);
         }
+    }
+
+    public static function haveForm($args) {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET')
+            throw new BadMethodCallException('haveForm must be a GET request');
+        if (count($args) != 1)
+            throw new BadMethodCallException('wrong number of arguments to haveForm');
+        if (!preg_match('/^[0-9a-f]{16}$/i', $args[0]))
+            throw new InvalidArgumentException('bad form hash in haveForm');
+
+        $hash = strtolower($args[0]);
+        // FIXME implement
+        echo 'false';
+    }
+
+    public static function uploadForm($args) {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST')
+            throw new BadMethodCallException('uploadForm: must be a POST request');
+        if (!isset($_SERVER['CONTENT_TYPE']) || $_SERVER['CONTENT_TYPE'] !== 'application/octet-stream')
+            throw new BadMethodCallException('uploadForm: wrong Content-Type specified');
+        if (!isset($_SERVER['CONTENT_LENGTH']) || !preg_match('/^(?:0|[1-9][0-9]{0,9})$/', $_SERVER['CONTENT_LENGTH']))
+            throw new BadMethodCallException('uploadForm: a valid Content-Length must be specified');
+
+        $length = (int) $_SERVER['CONTENT_LENGTH'];
+
+        if ($length < 1 || $length > MAX_FORM_SIZE)
+            throw new LengthException('uploadForm: specified Content-Length is out of valid bounds');
+        if (count($args) != 1)
+            throw new BadMethodCallException('wrong number of arguments to uploadForm');
+        if (!preg_match('/^[0-9a-f]{16}$/i', $args[0]))
+            throw new InvalidArgumentException('bad form hash in uploadForm');
+
+        $hash = strtolower($args[0]);
+
+        $post = fopen('php://input', 'r');
+        if (!$post) throw new Exception('uploadForm: could not open POST input');
+
+        $form = '';
+        $remaining = $length + 1; // try to read one extra byte to ensure truth of Content-Length
+        while (strlen($form) < $remaining && !feof($post)) {
+            $extra = fread($post, min(8192, $remaining));
+            if ($extra === FALSE)
+                throw new Exception('uploadForm: could not read POST input');
+            if (strlen($extra) == 0 && stream_get_meta_data($post)['timed_out'])
+                throw new Exception('uploadForm: got timeout while waiting for POST input');
+
+            $form .= $extra;
+        }
+        if (strlen($form) != $length)
+            throw new LengthException('uploadForm: received data length did not match Content-Length');
+
+        fclose($post);
+
+        $tmp = tempnam(Succinct::TMP_DIR, 'direct_form');
+        if ($tmp === false) throw new Exception('could not create temporary file');
+
+        if (file_put_contents($tmp, $form) === false) {
+            unlink($tmp);
+            throw new Exception("could not write to temporary file $tmp");
+        }
+
+        // FIXME move form to correct place
     }
 }
 
