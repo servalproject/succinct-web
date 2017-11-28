@@ -379,6 +379,7 @@ function show_chat(id, memberid) {
 
     msg.val('');
 
+    send.off("click");
     send.click(function () {
         send_chat_message(id, msg);
     });
