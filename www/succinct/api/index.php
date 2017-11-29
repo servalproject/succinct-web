@@ -201,20 +201,9 @@ class API {
 
         Succinct::update_lastseen($team, 'http', $_SERVER['REMOTE_ADDR']);
 
-        $lastfile = "$queuedir/last";
-
-        if (!file_exists($lastfile)) {
-            $last = -1;
-        } else {
-            $last = trim(@file_get_contents($lastfile));
-            if (!preg_match('/^[0-9]{10}$/', $last)) {
-                $last = -1;
-            }
-        }
-
         $fragfile = "$queuedir/ready/$seq";
 
-        if ($last == -1 || intval($seq) > intval($last) || !file_exists($fragfile)) {
+        if (!file_exists($fragfile)) {
             http_response_code(404);
         } else {
             Succinct::logi(TAG, "receiveFragment for $team/$seq");
@@ -226,18 +215,20 @@ class API {
             }
         }
 
-        $lastreqfile = "$queuedir/lastreq";
-        if (!file_exists($lastreqfile)) {
-            $lastreq = -1;
-        } else {
-            $lastreq = trim(@file_get_contents($lastreqfile));
-            if (!preg_match('/^[0-9]{10}$/', $lastreq)) {
-                $lastreq = -1;
+        $last = intval($seq) - 1;
+        if (file_exists("$queuedir/ready/$last")){
+            $ackfile = "$queuedir/httpacked";
+            if (!file_exists($ackfile)) {
+                $acked = -1;
+            } else {
+                $acked = trim(@file_get_contents($ackfile));
+                if (!preg_match('/^[0-9]{10}$/', $acked)) {
+                    $acked = -1;
+                }
             }
-        }
-
-        if (intval($seq) > intval($lastreq) && intval($seq) <= intval($last)+1) {
-            file_put_contents($lastreqfile, $seq);
+            if (intval($last) > intval($acked)) {
+                file_put_contents($ackfile, $last);
+            }
         }
     }
 
