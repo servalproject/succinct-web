@@ -242,7 +242,7 @@ class API {
 
         $hash = strtolower($args[0]);
 
-        echo is_dir(Succinct::MAGPI_FORMS_DIR . "/$hash/recipe") ? "true" : "false";
+        echo file_exists(Succinct::MAGPI_FORMS_DIR . "/form/$hash") ? "true" : "false";
     }
 
     public static function uploadForm($args) {
@@ -264,13 +264,16 @@ class API {
 
         $hash = strtolower($args[0]);
 
-        if (is_dir(Succinct::MAGPI_FORMS_DIR . "/$hash/recipe")) {
+        if (file_exists(Succinct::MAGPI_FORMS_DIR . "/form/$hash")) {
             // already have recipe
             return;
         }
 
-        if (!silent_mkdir(Succinct::MAGPI_FORMS_DIR) || !silent_mkdir(Succinct::MAGPI_FORMS_DIR."/$hash"))
-            throw new Exception("receiveForm: unable to make magpi/$hash directory");
+        if (!silent_mkdir(Succinct::MAGPI_FORMS_DIR) || !silent_mkdir(Succinct::MAGPI_FORMS_DIR."/form"))
+            throw new Exception("receiveForm: unable to make magpi/form directory");
+
+        if (!silent_mkdir(Succinct::MAGPI_FORMS_DIR) || !silent_mkdir(Succinct::MAGPI_FORMS_DIR."/recipe"))
+            throw new Exception("receiveForm: unable to make magpi/recipe directory");
 
         $post = fopen('php://input', 'r');
         if (!$post) throw new Exception('uploadForm: could not open POST input');

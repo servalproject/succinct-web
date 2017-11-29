@@ -102,12 +102,14 @@ class Succinct {
             return false; // throw new Exception('install_magpi_recipe: expected two files in magpi recipe output');
         }
 
-        if (!rename($tmpdir, self::MAGPI_FORMS_DIR . "/$hash/recipe")) {
-            shell_exec('rm -rf '.escapeshellarg($tmpdir));
-            return false; // throw new Exception('install_magpi_recipe: rename recipe directory failed');
-        }
+        // Since the result should be deterministic, I don't think we care about race conditions here
 
-        return true;
+        // TODO cleanup if any of these renames fail?
+        foreach ($files as $filename) {
+            if (!rename("$tmpdir/$filename", self::MAGPI_FORMS_DIR . "/recipe/$filename")
+                return false;
+        }
+        return rename($tmpfile, self::MAGPI_FORMS_DIR . "/form/$hash");
     }
 
     private static function db_connect() {
