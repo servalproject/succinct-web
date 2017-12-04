@@ -130,6 +130,11 @@ if (!Succinct::rebuild_messages($teamid, $seq)) {
     Succinct::loge(TAG, "could not start process to rebuild messages for team $teamid seq $seq");
 }
 
+$rockid = Succinct::team_active_rock($team);
+if ($rockid !== false && !Succinct::send_rock($teamid, $rockid)) {
+    Succinct::loge(TAG, "could not start process to send outgoing rock messages for team $teamid rockid $rockid");
+}
+
 function data_to_fragment($data) {
     Succinct::logv(TAG, "data: $data");
     return hex2bin($data);

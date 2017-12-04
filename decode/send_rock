@@ -1,0 +1,55 @@
+#!/bin/bash
+
+if [ $# -ne 3 ]; then
+    echo "Usage: $0 dir team rockid"
+    exit 2
+fi
+
+dir="$1"
+team="$2"
+rockid="$3"
+
+function error_exit {
+    echo "$1" >&2
+    exit "${2:-1}"
+}
+
+command -v flock >/dev/null 2>&1 || error_exit "$0 requires flock"
+
+[ -n "$dir" ] || error_exit "must specify root directory"
+[[ $team =~ ^[0-9a-f]{16}$ ]] || error_exit "$team: invalid team identifier"
+
+cd "$dir" || exit 1
+
+[ -z "${rockid}" ] && exit 0
+[ -e "$team/queue" ] || exit 0
+
+exec 200<"$team/queue" || error_exit "$team/queue: file descriptor could not be opened for reading"
+flock 200 || error_exit "$team/queue: unable to obtain lock"
+
+[ -e "$team/queue/last" ] || exit 0
+
+read last < "$team/queue/last"
+[ $? -ne 0 ] || [ -z "$last" ] || error_exit "$team/queue/last: should be a number"
+
+if [ -f "$team/queue/rocksent" ]; then
+    read sent < "$team/queue/rocksent"
+    [ $? -ne 0 ] || [ -z "$sent" ] || error_exit "$team/queue/rocksent: should be a number"
+else
+    sent=-1
+fi
+
+if [ -f "$team/queue/httpacked" ]; then
+    read httpack < "$team/queue/httpacked"
+    [ $? -ne 0 ] || [ -z "$httpack" ] || error_exit "$team/queue/httpacked: should be a number"
+    [ $httpack -gt $sent ] && sent=$httpack
+fi
+
+function nextseq {
+    local seq=$((10#$1))
+    printf "%010d\n" $((seq+1))
+}
+
+echo "TODO send fragments $sent to $last via rock api"
+
+echo "$sent" > "$team/queue/rocksent"

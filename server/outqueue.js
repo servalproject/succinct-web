@@ -23,6 +23,22 @@ class OutQueue {
                 });
         }.bind(this));
     }
+
+    async send_rock(team, rockid) {
+        console.log('send_rock', team, rockid);
+        if (rockid == "") return;
+        await new Promise(function(resolve, reject) {
+            child_process.exec('./send_rock '+shellescape([this.config.spool, team, rockid]),
+                {cwd: this.config.decode, encoding: 'utf8'},
+                (err, stdout, stderr) => {
+                    if (err) {
+                        console.warn('failed to send via rock:', stderr);
+                        reject(err);
+                    }
+                    resolve();
+                });
+        }.bind(this));
+    }
 }
 
 module.exports = OutQueue;

@@ -32,6 +32,7 @@ class Succinct {
     const FRAGINFO = self::ROOT . '/decode/fraginfo';
     const PLACE_FRAGMENT = self::ROOT . '/decode/place_fragment';
     const REBUILD_MESSAGES = self::ROOT . '/decode/rebuild_messages';
+    const SEND_ROCK = self::ROOT . '/decode/send_rock';
     const SMAC = self::ROOT . '/smac/smac';
 
     const SPOOL_DIR = self::ROOT . '/spool';
@@ -67,6 +68,20 @@ class Succinct {
             .' && '.escapeshellcmd(self::REBUILD_MESSAGES).' '.escapeshellcmd(self::SPOOL_DIR)
             .' '.escapeshellarg($team).' '.escapeshellarg($seq)
             .' >> '.escapeshellarg(self::ROOT . '/log/rebuild.log').' 2>&1';
+        if ($background) {
+            $cmd .= ' &';
+        }
+        $out = exec($cmd, $outa, $ret);
+        return ($ret == 0);
+    }
+
+    public static function send_rock($team, $rockid, $background = true) {
+        if (strlen($team) == '' || strlen($rockid) == '') return false;
+
+        $cmd = 'cd '.escapeshellcmd(dirname(self::SEND_ROCK))
+            .' && '.escapeshellcmd(self::SEND_ROCK).' '.escapeshellcmd(self::SPOOL_DIR)
+            .' '.escapeshellarg($team)
+            .' >> '.escapeshellarg(self::ROOT . '/log/send_rock.log').' 2>&1';
         if ($background) {
             $cmd .= ' &';
         }
@@ -116,7 +131,7 @@ class Succinct {
         if (self::$mysqli) return true;
         self::$mysqli = new mysqli(self::MYSQL_HOST, self::MYSQL_USER, self::MYSQL_PASS, self::MYSQL_BASE);
         if (self::$mysqli->connect_errno) {
-            self::loge('Succinct', 'update_lastseen: MySQL connection error '.self::$mysqli->connect_error);
+            self::loge('Succinct', 'db_connect: MySQL connection error '.self::$mysqli->connect_error);
             self::$mysqli = false;
             return false;
         }
@@ -158,7 +173,32 @@ class Succinct {
         if (self::$mysqli->affected_rows == 1) {
             self::logd('Succinct', "update_lastseen: inserted new team $team (".self::$mysqli->insert_id.") from $method message");
         }
+        $res->free();
         return true;
+    }
+
+    // Return the active rock unit for a team,
+    // but only if the rock unit has been seen more recently than either SMS or HTTP
+    public static function team_active_rock($team) {
+        if (!self::db_connect()) return false;
+
+        $team_esc = self::$mysqli->real_escape_string($team);
+        $sql = "SELECT lastseen_rock_id "
+              ."FROM teams "
+              ."WHERE teamid = $team_esc "
+              ."AND lastseen_rock_time > lastseen_http_time "
+              ."AND lastseen_rock_time > lastseen_sms_time ";
+        $res = self::$mysqli->query($sql);
+        if (!$res) {
+            self::loge('Succinct', "get_active_rock: MySQL query error ".self::$mysqli->error);
+            return false;
+        }
+        $ret = false;
+        if ($row = $res->fetch_assoc()) {
+            $ret = $row["lastseen_rock_id"];
+        }
+        $res->free();
+        return $ret;
     }
 
     private static function log($tag, $msg, $level) {

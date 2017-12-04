@@ -40,6 +40,19 @@ class Db {
         return to_normal_object(teams[0]);
     }
 
+    async team_active_rockid(teamid) {
+        if (!this.connected) {
+            throw new Error('mysql not connected');
+        }
+        var [result] = await this.execute('SELECT lastseen_rock_id ' +
+              'FROM teams ' +
+              'WHERE teamid = ? '
+              'AND lastseen_rock_time > lastseen_http_time '
+              'AND lastseen_rock_time > lastseen_sms_time ', [teamid]);
+        if (result.length == 0) return null;
+        return teams[0].lastseen_rock_id;
+    }
+
     async teams_before(date, teamlimit) {
         if (!Number.isInteger(teamlimit) || teamlimit < 1) {
             throw new Error('unexpected team limit');
