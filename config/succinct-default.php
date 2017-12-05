@@ -174,7 +174,6 @@ class Succinct {
         if (self::$mysqli->affected_rows == 1) {
             self::logd('Succinct', "update_lastseen: inserted new team $team (".self::$mysqli->insert_id.") from $method message");
         }
-        $res->free();
         return true;
     }
 
