@@ -9,15 +9,20 @@ dir="$1"
 team="$2"
 rockid="$3"
 
+[ -f "${0%/*}../config/config.vars" ] && . "${0%/*}../config/config.vars"
+
 function error_exit {
     echo "$1" >&2
     exit "${2:-1}"
 }
 
 command -v flock >/dev/null 2>&1 || error_exit "$0 requires flock"
+command -v curl >/dev/null 2>&1 || error_exit "$0 requires curl"
 
 [ -n "$dir" ] || error_exit "must specify root directory"
 [[ $team =~ ^[0-9a-f]{16}$ ]] || error_exit "$team: invalid team identifier"
+[ -z "$ROCK_USER" ] && error_exit "ROCK_USER: has not been defined"
+[ -z "$ROCK_PASSWORD" ] && error_exit "ROCK_PASSWORD: has not been defined"
 
 cd "$dir" || exit 1
 
@@ -46,7 +51,7 @@ fi
 if [ -f "$team/queue/httpacked" ]; then
     read httpack < "$team/queue/httpacked"
     [ $? -ne 0 ] || [ -z "$httpack" ] || error_exit "$team/queue/httpacked: should be a number"
-    [ $httpack -gt $sent ] && sent=$httpack
+    [ "$((10#$httpack))" -gt "$((#$sent))" ] && sent=$httpack
 fi
 
 function nextseq {
@@ -54,6 +59,17 @@ function nextseq {
     printf "%010d\n" $((seq+1))
 }
 
-echo "TODO send fragments $sent to $last via rock api"
+sent="$(nextseq "$sent")"
+while [ "$send" -ne "$last" ]; do
+    [ -f "$team/queue/ready/$sent" ] || error_exit "$team/queue/read/$sent: not found"
+    hexdata=`hexdump -v -e '/1 "%02x"' "$team/queue/ready/$sent"`
 
-echo -n "$sent" > "$team/queue/rocksent"
+    curl --output "$team/queue/${sent}.log" --include \
+         --data "username=${ROCK_USER}&password=${ROCK_PASSWORD}&data=${hexdata}" \
+         "https://core.rock7.com/API2/SendRawMessage/${rockid}"
+    [ $? -eq 0 ] || error_exit "Failed to send fragment ${sent} to ${rockid}, check ${team}/queue/${sent}.log for more info"
+
+    echo -n "$sent" > "$team/queue/rocksent"
+    sent="$(nextseq "$sent")"
+done
+
