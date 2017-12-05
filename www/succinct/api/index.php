@@ -215,7 +215,7 @@ class API {
             }
         }
 
-        $last = intval($seq) - 1;
+        $last = sprintf('%010d', intval($seq) - 1);
         if (file_exists("$queuedir/ready/$last")){
             $ackfile = "$queuedir/httpacked";
             if (!file_exists($ackfile)) {
