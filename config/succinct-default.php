@@ -121,8 +121,9 @@ class Succinct {
 
         // TODO cleanup if any of these renames fail?
         foreach ($files as $filename) {
-            if (!rename("$tmpdir/$filename", self::MAGPI_FORMS_DIR . "/recipe/$filename")
+            if (!rename("$tmpdir/$filename", self::MAGPI_FORMS_DIR . "/recipe/$filename")) {
                 return false;
+            }
         }
         return rename($tmpfile, self::MAGPI_FORMS_DIR . "/form/$hash");
     }
