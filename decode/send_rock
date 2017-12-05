@@ -30,11 +30,15 @@ flock 200 || error_exit "$team/queue: unable to obtain lock"
 [ -e "$team/queue/last" ] || exit 0
 
 read last < "$team/queue/last"
-[ $? -ne 0 ] || [ -z "$last" ] || error_exit "$team/queue/last: should be a number"
+if [ $? -ne 0 ] || [ -z "$last" ]; then
+    error_exit "$team/queue/last: should be a number"
+fi
 
 if [ -f "$team/queue/rocksent" ]; then
     read sent < "$team/queue/rocksent"
-    [ $? -ne 0 ] || [ -z "$sent" ] || error_exit "$team/queue/rocksent: should be a number"
+    if [ $? -ne 0 ] || [ -z "$sent" ]; then
+        error_exit "$team/queue/rocksent: should be a number"
+    fi
 else
     sent=-1
 fi
@@ -52,4 +56,4 @@ function nextseq {
 
 echo "TODO send fragments $sent to $last via rock api"
 
-echo "$sent" > "$team/queue/rocksent"
+echo -n "$sent" > "$team/queue/rocksent"

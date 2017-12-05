@@ -62,4 +62,4 @@ fi
 
 mv "$team/queue/tmp/$next" "$team/queue/ready/$next" || exit 1
 
-echo "$next" > "$team/queue/last"
+echo -n "$next" > "$team/queue/last"
