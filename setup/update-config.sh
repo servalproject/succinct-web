@@ -24,6 +24,8 @@ fi
   echo "SUCCINCT_HOME=\"$SUCCINCT_HOME\""
   echo "TEXTMAGIC_CALLBACK_KEY=\"$TEXTMAGIC_CALLBACK_KEY\""
   echo "ROCK_CALLBACK_KEY=\"$ROCK_CALLBACK_KEY\""
+  echo "ROCK_USER=\"$ROCK_USER\""
+  echo "ROCK_PASSWORD=\"$ROCK_PASSWORD\""
   echo "DIRECT_API_KEY=\"$DIRECT_API_KEY\""
 ) > config/config.vars.new
 

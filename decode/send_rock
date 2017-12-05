@@ -34,6 +34,8 @@ flock 200 || error_exit "$team/queue: unable to obtain lock"
 
 [ -e "$team/queue/last" ] || exit 0
 
+mkdir -p "$team/queue/logs" || exit 1
+
 read last < "$team/queue/last"
 if [ $? -ne 0 ] || [ -z "$last" ]; then
     error_exit "$team/queue/last: should be a number"
@@ -60,16 +62,18 @@ function nextseq {
 }
 
 sent="$(nextseq "$sent")"
-while [ "$send" -ne "$last" ]; do
+while [ "$sent" -ne "$last" ]; do
     [ -f "$team/queue/ready/$sent" ] || error_exit "$team/queue/read/$sent: not found"
     hexdata=`hexdump -v -e '/1 "%02x"' "$team/queue/ready/$sent"`
 
-    curl --output "$team/queue/${sent}.log" --include \
+    curl --output "$team/queue/logs/${sent}.log" --include \
          --data "username=${ROCK_USER}&password=${ROCK_PASSWORD}&data=${hexdata}" \
          "https://core.rock7.com/API2/SendRawMessage/${rockid}"
-    [ $? -eq 0 ] || error_exit "Failed to send fragment ${sent} to ${rockid}, check ${team}/queue/${sent}.log for more info"
-
-    echo -n "$sent" > "$team/queue/rocksent"
-    sent="$(nextseq "$sent")"
+    if [ $? -eq 0 ] && grep receipt "$team/queue/logs/${sent}.log"; then
+        echo -n "$sent" > "$team/queue/rocksent"
+        sent="$(nextseq "$sent")"
+    else
+        error_exit "Failed to send fragment ${sent} to ${rockid}, check ${team}/queue/logs/${sent}.log for more info"
+    fi
 done
 
