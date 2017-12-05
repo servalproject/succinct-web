@@ -40,9 +40,7 @@ function nextseq {
 
 if [ -f "$team/queue/last" ]; then
     read last < "$team/queue/last"
-    if [ $? -ne 0 ] || [ -z "$last" ]; then
-        last=-1
-    fi
+    [ -z "$last" ] && error_exit "$team/queue/last: seq number not valid"
 else
     last=-1
 fi

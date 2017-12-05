@@ -37,22 +37,18 @@ flock 200 || error_exit "$team/queue: unable to obtain lock"
 mkdir -p "$team/queue/logs" || exit 1
 
 read last < "$team/queue/last"
-if [ $? -ne 0 ] || [ -z "$last" ]; then
-    error_exit "$team/queue/last: should be a number"
-fi
+[ -z "$last" ] && error_exit "$team/queue/last: should be a number"
 
 if [ -f "$team/queue/rocksent" ]; then
     read sent < "$team/queue/rocksent"
-    if [ $? -ne 0 ] || [ -z "$sent" ]; then
-        error_exit "$team/queue/rocksent: should be a number"
-    fi
+    [ -z "$sent" ] && error_exit "$team/queue/rocksent: should be a number"
 else
     sent=-1
 fi
 
 if [ -f "$team/queue/httpacked" ]; then
     read httpack < "$team/queue/httpacked"
-    [ $? -ne 0 ] || [ -z "$httpack" ] || error_exit "$team/queue/httpacked: should be a number"
+    [ -z "$httpack" ] && error_exit "$team/queue/httpacked: should be a number"
     [ "$((10#$httpack))" -gt "$((#$sent))" ] && sent=$httpack
 fi
 
