@@ -49,7 +49,7 @@ fi
 if [ -f "$team/queue/httpacked" ]; then
     read httpack < "$team/queue/httpacked"
     [ -z "$httpack" ] && error_exit "$team/queue/httpacked: should be a number"
-    [ "$((10#$httpack))" -gt "$((#$sent))" ] && sent=$httpack
+    [ "$httpack" -gt "$sent" ] && sent=$httpack
 fi
 
 function nextseq {
