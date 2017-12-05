@@ -26,7 +26,7 @@ class OutQueue {
 
     async send_rock(team, rockid) {
         console.log('send_rock', team, rockid);
-        if (rockid == "") return;
+        if (!rockid) return;
         await new Promise(function(resolve, reject) {
             child_process.exec('./send_rock '+shellescape([this.config.spool, team, rockid]),
                 {cwd: this.config.decode, encoding: 'utf8'},
