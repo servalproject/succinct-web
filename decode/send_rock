@@ -9,7 +9,7 @@ dir="$1"
 team="$2"
 rockid="$3"
 
-[ -f "${0%/*}../config/config.vars" ] && . "${0%/*}../config/config.vars"
+[ -f "${0%/*}/../config/config.vars" ] && . "${0%/*}/../config/config.vars"
 
 function error_exit {
     echo "$1" >&2
