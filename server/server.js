@@ -119,7 +119,7 @@ async function message(data, conn) {
     conn.log(`got message for team ${team.teamid}: ${msg}`);
     var now = Math.round(Date.now()/100)*100;
     try {
-        await outqueue.queue_chat(team.teamid, msg, rockid, now-Date.parse(team.started));
+        await outqueue.queue_chat(team.teamid, msg, now-Date.parse(team.started));
         await teamdata.chat(team.teamid, 0, msg, now);
         var rockid = await db.team_active_rockid(team.teamid);
         await outqueue.send_rock(team.teamid, rockid);
