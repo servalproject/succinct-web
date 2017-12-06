@@ -62,7 +62,8 @@ while [ "$sent" -ne "$last" ]; do
     [ -f "$team/queue/ready/$sent" ] || error_exit "$team/queue/read/$sent: not found"
     hexdata=`hexdump -v -e '/1 "%02x"' "$team/queue/ready/$sent"`
 
-    curl --output "$team/queue/logs/${sent}.log" --include \
+    curl --silent --show-error \
+         --output "$team/queue/logs/${sent}.log" --include \
          --data "username=${ROCK_USER}&password=${ROCK_PASSWORD}&data=${hexdata}" \
          "https://core.rock7.com/API2/SendRawMessage/${rockid}"
     if [ $? -eq 0 ] && grep receipt "$team/queue/logs/${sent}.log"; then
