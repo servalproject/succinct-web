@@ -51,7 +51,7 @@ class Db {
               'AND lastseen_rock_time > ifnull(lastseen_sms_time,\'1970-01-01\') ',
               [teamid]);
         if (result.length == 0) return null;
-        return teams[0].lastseen_rock_id;
+        return result[0].lastseen_rock_id;
     }
 
     async teams_before(date, teamlimit) {
