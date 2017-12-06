@@ -89,6 +89,11 @@ async function init_teamdata() {
     console.log(require('util').inspect(teamdata.active, false, null));
 }
 
+async function send_via_rock(team) {
+   var rockid = await db.team_active_rockid(team);
+   await outqueue.send_rock(team, rockid);
+}
+
 async function message(data, conn) {
     if (!Array.isArray(data) || data.length != 2) {
         conn.warn('invalid input in chat message');
@@ -121,8 +126,7 @@ async function message(data, conn) {
     try {
         await outqueue.queue_chat(team.teamid, msg, now-Date.parse(team.started));
         await teamdata.chat(team.teamid, 0, msg, now);
-        var rockid = await db.team_active_rockid(team.teamid);
-        await outqueue.send_rock(team.teamid, rockid);
+        send_via_rock(team.teamid); // DONT WAIT
         return true;
     } catch (e) {
         conn.warn('failed to queue chat message', e);

@@ -33,7 +33,6 @@ class OutQueue {
                 (err, stdout, stderr) => {
                     if (err) {
                         console.warn('failed to send via rock:', stderr);
-                        reject(err);
                     }
                     resolve();
                 });
