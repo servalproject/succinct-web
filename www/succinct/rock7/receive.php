@@ -116,7 +116,7 @@ if ($seq === false) {
 if (Succinct::team_is_finished($teamid))
     Succinct::logw(TAG, "received fragment for finished team $teamid");
 
-Succinct::update_lastseen($teamid, 'rock', $user_key);
+Succinct::update_lastseen($teamid, 'rock', $serial);
 
 if (Succinct::place_fragment($tmp)) {
     Succinct::logd(TAG, "received fragment for team $teamid with seq $seq");
@@ -130,9 +130,8 @@ if (!Succinct::rebuild_messages($teamid, $seq)) {
     Succinct::loge(TAG, "could not start process to rebuild messages for team $teamid seq $seq");
 }
 
-$rockid = Succinct::team_active_rock($team);
-if ($rockid !== false && !Succinct::send_rock($teamid, $rockid)) {
-    Succinct::loge(TAG, "could not start process to send outgoing rock messages for team $teamid rockid $rockid");
+if (!Succinct::send_rock($teamid, $serial)) {
+    Succinct::loge(TAG, "could not start process to send outgoing rock messages for team $teamid serial $serial");
 }
 
 function data_to_fragment($data) {
