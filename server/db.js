@@ -47,9 +47,9 @@ class Db {
         var [result] = await this.execute('SELECT lastseen_rock_id ' +
               'FROM teams ' +
               'WHERE teamid = ? ' +
-              'AND lastseen_rock_time > ifnull(lastseen_http_time,?) ' +
-              'AND lastseen_rock_time > ifnull(lastseen_sms_time,?) ',
-              [teamid], '1970-01-01', '1970-01-01');
+              'AND lastseen_rock_time > ifnull(lastseen_http_time,\'1970-01-01\') ' +
+              'AND lastseen_rock_time > ifnull(lastseen_sms_time,\'1970-01-01\') ',
+              [teamid]);
         if (result.length == 0) return null;
         return teams[0].lastseen_rock_id;
     }
