@@ -186,8 +186,8 @@ class Succinct {
         $sql = "SELECT lastseen_rock_id "
               ."FROM teams "
               ."WHERE teamid = $team_esc "
-              ."AND lastseen_rock_time > lastseen_http_time "
-              ."AND lastseen_rock_time > lastseen_sms_time ";
+              ."AND lastseen_rock_time > ifnull(lastseen_http_time, '1970-01-01') "
+              ."AND lastseen_rock_time > ifnull(lastseen_sms_time,'1970-01-01') ";
         $res = self::$mysqli->query($sql);
         if (!$res) {
             self::loge('Succinct', "get_active_rock: MySQL query error ".self::$mysqli->error);
