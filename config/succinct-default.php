@@ -80,7 +80,7 @@ class Succinct {
 
         $cmd = 'cd '.escapeshellcmd(dirname(self::SEND_ROCK))
             .' && '.escapeshellcmd(self::SEND_ROCK).' '.escapeshellcmd(self::SPOOL_DIR)
-            .' '.escapeshellarg($team)
+            .' '.escapeshellarg($team) .' '.escapeshellarg($rockid)
             .' >> '.escapeshellarg(self::ROOT . '/log/send_rock.log').' 2>&1';
         if ($background) {
             $cmd .= ' &';
