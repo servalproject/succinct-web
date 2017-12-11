@@ -57,8 +57,8 @@ function nextseq {
     printf "%010d\n" $((seq+1))
 }
 
-sent="$(nextseq "$sent")"
-while [ "$sent" -ne "$last" ]; do
+while [ "$sent" -lt "$last" ]; do
+    sent="$(nextseq "$sent")"
     [ -f "$team/queue/ready/$sent" ] || error_exit "$team/queue/read/$sent: not found"
     hexdata=`hexdump -v -e '/1 "%02x"' "$team/queue/ready/$sent"`
 
@@ -68,7 +68,6 @@ while [ "$sent" -ne "$last" ]; do
          "https://core.rock7.com/API2/SendRawMessage/${rockid}"
     if [ $? -eq 0 ] && grep receipt "$team/queue/logs/${sent}.log"; then
         echo -n "$sent" > "$team/queue/rocksent"
-        sent="$(nextseq "$sent")"
     else
         error_exit "Failed to send fragment ${sent} to ${rockid}, check ${team}/queue/logs/${sent}.log for more info"
     fi
