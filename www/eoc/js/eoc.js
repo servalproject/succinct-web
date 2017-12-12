@@ -60,17 +60,27 @@ if (!supportsWebSockets) {
 
 var socket;
 
-// todo remove this delay
-// only there to ensure FireFox web tools have a chance to see the WS connection
-setTimeout(function () {
+function connect_socket() {
+    if (socket)
+        return;
+
     socket = new WebSocket('ws://' + location.host + '/eoc-ws');
 
     socket.onmessage = handle_message;
 
-    socket.onopen = function () {
-        authenticate();
+    socket.onopen = authenticate;
+
+    socket.onclose = function () {
+        socket = false;
+        rpc.initialised = false;
+        // reconnect after 10s
+        setTimeout(connect_socket, 10000);
     };
-}, 1000);
+}
+
+// todo remove this delay
+// only there to ensure FireFox web tools have a chance to see the WS connection
+setTimeout(connect_socket, 1000);
 
 function authenticate() {
     // todo send real authentication token
@@ -667,6 +677,9 @@ function cmp_team(a, b) {
 }
 
 function rpc(socket, cmd, data, callback) {
+    if (!socket){
+        return;
+    }
     if (!rpc.initialised) {
         rpc.callbacks = [];
         rpc.nextid = 1;
