@@ -5,19 +5,19 @@ const mysql = require('mysql2/promise');
 class Db {
     constructor(config) {
         this.config = config;
-        this.conn = null;
+        this.pool = null;
         this.connected = false;
     }
 
     async connect() {
-        this.conn = await mysql.createConnection(this.config);
+        this.pool = await mysql.createPool(this.config);
         this.connected = true;
         console.log('mysql connected');
     }
 
     async disconnect() {
         if (!this.connected) return;
-        await this.conn.end();
+        await this.pool.end();
         this.connected = false;
     }
 
@@ -153,7 +153,7 @@ class Db {
 
     // does not use mysql2 cached statements
     async query(sql, vals, ...args) {
-        var result = await this.conn.query(sql, vals, ...args);
+        var result = await this.pool.query(sql, vals, ...args);
         if (this.config.log_queries) {
             let rows = result[0].length;
             if (typeof vals === 'undefined') vals = '';
@@ -164,7 +164,7 @@ class Db {
 
     // uses mysql2 cached statements
     async execute(sql, vals, ...args) {
-        var result = await this.conn.execute(sql, vals, ...args);
+        var result = await this.pool.execute(sql, vals, ...args);
         if (this.config.log_queries) {
             let rows = result[0].length;
             if (typeof vals === 'undefined') vals = '';

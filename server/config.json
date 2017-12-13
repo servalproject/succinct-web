@@ -5,6 +5,7 @@
     "json_dir": "../spool/json",
     "msg_max_bytes": 250,
     "mysql": {
+        "connectionLimit": "100",
         "host": "localhost",
         "user": "ramp",
         "password": "",
