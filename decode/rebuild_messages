@@ -17,12 +17,10 @@ function error_exit {
 command -v flock >/dev/null 2>&1 || error_exit "$0 requires flock"
 command -v mktemp >/dev/null 2>&1 || error_exit "$0 requires mktemp"
 command -v realpath >/dev/null 2>&1 || error_exit "$0 requires realpath"
+command -v ./process_fragment >/dev/null 2>&1 || error_exit "$0 requires ./process_fragment"
 command -v ./fraginfo >/dev/null 2>&1 || error_exit "$0 requires ./fraginfo"
-command -v ./fragextract >/dev/null 2>&1 || error_exit "$0 requires ./fragextract"
-command -v ./message_to_json > /dev/null 2>&1 || error_exit "$0 requires ./message_to_json"
+PROCESSFRAG=$(realpath ./process_fragment)
 FRAGINFO=$(realpath ./fraginfo)
-FRAGEXTRACT=$(realpath ./fragextract)
-MESSAGETOJSON=$(realpath ./message_to_json)
 
 [ -n "$dir" ] || error_exit "must specify root directory"
 [[ $team =~ ^[0-9a-f]{16}$ ]] || error_exit "$team: invalid team identifier"
@@ -145,14 +143,17 @@ function rebuild_msg {
     mkdir -p "$team/messages/new" || exit 1
     mkdir -p "$team/messages/done" || exit 1
 
-    local tmp
-    tmp=$(mktemp "$team/messages/tmp/$seq.$msgpad.XXXXXX")
+    local msgtmp
+    local jsontmp
+    msgtmp=$(mktemp "$team/messages/tmp/$seq.$msgpad.XXXXXX")
     [ $? -eq 0 ] || exit 1
+    jsontmp="json/tmp/$team-$seq.$msgpad.json"
 
-    "$FRAGEXTRACT" "$team/fragments/partial" $seq $msg > "$tmp"
-    [ $? -eq 0 ] || { echo "warning: message $team/$seq.$msgpad could not be extracted" >&2; rm -f "$tmp"; return 1; }
+    "$PROCESSFRAG" "$team" "$team/fragments/partial" $seq $msg "$msgtmp" "$jsontmp"
+    [ $? -eq 0 ] || { echo "warning: message $team/$seq.$msgpad could not be processed" >&2; rm -f "$msgtmp"; rm -f "jsontmp"; return 1; }
 
-    echo "extracted: $team/$seq.$msgpad"
+    mv "$jsontmp" "json/new/"
+    mv "$msgtmp" "$team/messages/done/$seq.$msgpad"
 
     local span=$("$FRAGINFO" msgspan "$team/fragments/partial" $seq $msg)
     local next
@@ -166,13 +167,6 @@ function rebuild_msg {
         done
     fi
 
-    mv "$tmp" "$team/messages/new/$seq.$msgpad" || exit 1
-    if "$MESSAGETOJSON" "$team" "$team/messages/new/$seq.$msgpad" > "json/tmp/$team-$seq.$msgpad.json"; then
-        mv "json/tmp/$team-$seq.$msgpad.json" "json/new" || return 0
-        mv "$team/messages/new/$seq.$msgpad" "$team/messages/done"
-    else
-        rm -f "json/tmp/$team-$seq.$msgpad.json"
-    fi
     return 0
 }
 

@@ -1,8 +1,7 @@
+/process_fragment
 /place_fragment
 /fraginfo
-/fragextract
 /fragwrite
-/message_to_json
 /msgwrite
 /*.o
 /ccan/json/*.o

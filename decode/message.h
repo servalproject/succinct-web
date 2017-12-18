@@ -115,6 +115,10 @@ int write_message(FILE *out, message_t msg);
 /* returns full length of message written, or 0 if error */
 int write_message_raw(FILE *out, enum msg_type type, uint8_t *buf, unsigned int len);
 
+/* convert message contents to json */
+typedef struct JsonNode JsonNode;
+int message_to_json(const char *teamid, message_t msg, JsonNode *root);
+
 /* free any memory associated with msg */
 void free_message(message_t msg);
 

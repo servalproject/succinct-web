@@ -6,8 +6,8 @@
 #include <stdlib.h>
 #include "message.h"
 #include "fragment.h"
-
 #include "utf8.h"
+#include "ccan/json/json.h"
 
 static_assert(MSG_TYPELEN == 1, "MSG_TYPELEN must be 1");
 static_assert(MSG_LENGTHLEN == 2, "MSG_LENGTHLEN must be 2");
@@ -537,4 +537,73 @@ void free_message(message_t msg) {
         default:
             break;
     }
+}
+
+static const char utf8hex[16] = u8"0123456789abcdef";
+int message_to_json(const char *teamid, message_t msg, JsonNode *root){
+    json_append_member(root, u8"team", json_mkstring(teamid));
+
+    switch (msg.info.type) {
+        case TEAM_START:
+            json_append_member(root, u8"type", json_mkstring(u8"start"));
+            json_append_member(root, u8"time", json_mknumber(msg.data.team_start.time));
+            json_append_member(root, u8"name", json_mkstring(msg.data.team_start.name));
+            break;
+        case TEAM_END:
+            json_append_member(root, u8"type", json_mkstring(u8"end"));
+            json_append_member(root, u8"time", json_mknumber(msg.data.team_end.time));
+            break;
+        case MEMBER_JOIN:
+            json_append_member(root, u8"type", json_mkstring(u8"join"));
+            json_append_member(root, u8"member", json_mknumber(msg.data.member_join.member));
+            json_append_member(root, "reltime", json_mknumber(100.0*msg.data.member_join.time));
+            json_append_member(root, u8"name", json_mkstring(msg.data.member_join.name));
+            json_append_member(root, u8"id", json_mkstring(msg.data.member_join.id));
+            break;
+        case MEMBER_PART:
+            json_append_member(root, u8"type", json_mkstring(u8"part"));
+            json_append_member(root, u8"member", json_mknumber(msg.data.member_part.member));
+            json_append_member(root, u8"reltime", json_mknumber(100.0*msg.data.member_part.time));
+            break;
+        case LOCATION:
+            json_append_member(root, u8"type", json_mkstring(u8"location"));
+            JsonNode *locations = json_mkarray();
+            for (int i=0; i < msg.data.location.length; i++) {
+                JsonNode *obj = json_mkobject();
+                member_location location = msg.data.location.locations[i];
+                json_append_member(obj, u8"member", json_mknumber(location.member));
+                json_append_member(obj, u8"reltime", json_mknumber(100.0*location.time));
+                json_append_member(obj, u8"lat", json_mknumber(location.lat));
+                json_append_member(obj, u8"lng", json_mknumber(location.lng));
+                json_append_member(obj, u8"acc", json_mknumber(location.acc));
+                json_append_element(locations, obj);
+            }
+            json_append_member(root, u8"locations", locations);
+            break;
+        case CHAT:
+            json_append_member(root, u8"type", json_mkstring(u8"chat"));
+            json_append_member(root, u8"member", json_mknumber(msg.data.chat.member));
+            json_append_member(root, u8"reltime", json_mknumber(100.0*msg.data.chat.time));
+            json_append_member(root, u8"message", json_mkstring(msg.data.chat.message));
+            break;
+        case MAGPI_FORM:
+            json_append_member(root, u8"type", json_mkstring(u8"magpi-form"));
+            json_append_member(root, u8"member", json_mknumber(msg.data.magpi_form.member));
+            json_append_member(root, u8"reltime", json_mknumber(100.0*msg.data.magpi_form.time));
+            char *hexdata = malloc(2*msg.data.magpi_form.length+1);
+            if (!hexdata) err(1, "malloc");
+            for (int i=0; i<msg.data.magpi_form.length; i++) {
+                uint8_t byte = msg.data.magpi_form.data[i];
+                hexdata[2*i+0] = utf8hex[byte >> 4];
+                hexdata[2*i+1] = utf8hex[byte & 0xf];
+            }
+            hexdata[2*msg.data.magpi_form.length] = '\0';
+            json_append_member(root, u8"hexdata", json_mkstring(hexdata));
+            free(hexdata);
+            break;
+        default:
+            warnx("%s: unknown message type (%d)", __func__, msg.info.type);
+            return 1;
+    }
+    return 0;
 }
