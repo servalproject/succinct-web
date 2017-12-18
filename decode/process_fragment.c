@@ -12,8 +12,8 @@ static uint8_t message[MSG_MAXLEN];
 static const char utf8hex[16] = u8"0123456789abcdef";
 
 int main(int argc, char *argv[]) {
-    if (argc != 7) {
-        fprintf(stderr, "Usage: process_fragment teamid directory seq msgnum msgfile jsonfile\n");
+    if (argc != 8) {
+        fprintf(stderr, "Usage: process_fragment teamid directory seq msgnum msgfile jsonfile magpifile\n");
         return 2;
     }
     char *teamidl = argv[1];
@@ -22,6 +22,7 @@ int main(int argc, char *argv[]) {
     char *msgnum = argv[4];
     char *msgfile = argv[5];
     char *jsonfile = argv[6];
+    char *magpifile = argv[7];
 
     if (chdir(dir) != 0) err(1, "%s: chdir", dir);
 
@@ -60,13 +61,15 @@ int main(int argc, char *argv[]) {
 
     FILE *out;
     if (strcmp(msgfile,"-")==0)
-       out = stdout;
-    else
-       out = fopen(msgfile, "w");
-
+        out = stdout;
+    else{
+        out = fopen(msgfile, "w");
+        if (!out)
+            errx(1, "could not open %s", msgfile);
+    }
     fwrite(message, 1, length, out);
     if (out != stdout)
-       fclose(out);
+        fclose(out);
 
     message_t msg = parse_message(message, length);
     if (msg.info.type == MSG_TYPE_ERROR) {
@@ -74,7 +77,16 @@ int main(int argc, char *argv[]) {
     }
 
     if (msg.info.type == MAGPI_FORM){
-        // TODO
+        if (strcmp(magpifile,"-")==0)
+            out = stdout;
+        else{
+            out = fopen(magpifile,"w");
+            if (!out)
+                errx(1, "could not open %s", magpifile);
+        }
+        fwrite(msg.data.magpi_form.data, 1, msg.data.magpi_form.length, out);
+        if (out != stdout)
+           fclose(out);
     }
 
     JsonNode *root = json_mkobject();
@@ -82,8 +94,11 @@ int main(int argc, char *argv[]) {
     if (r==0){
         if (strcmp(jsonfile,"-")==0)
             out = stdout;
-        else
+        else{
             out = fopen(jsonfile,"w");
+            if (!out)
+                errx(1, "could not open %s", jsonfile);
+        }
         fputs(json_encode(root), out);
         fputc('\n', out);
         if (out != stdout)

@@ -19,8 +19,10 @@ command -v mktemp >/dev/null 2>&1 || error_exit "$0 requires mktemp"
 command -v realpath >/dev/null 2>&1 || error_exit "$0 requires realpath"
 command -v ./process_fragment >/dev/null 2>&1 || error_exit "$0 requires ./process_fragment"
 command -v ./fraginfo >/dev/null 2>&1 || error_exit "$0 requires ./fraginfo"
+command -v ../smac/smac >/dev/null 2>&1 || error_exit "$0 requires ../smac/smac"
 PROCESSFRAG=$(realpath ./process_fragment)
 FRAGINFO=$(realpath ./fraginfo)
+SMAC=$(realpath ../smac/smac)
 
 [ -n "$dir" ] || error_exit "must specify root directory"
 [[ $team =~ ^[0-9a-f]{16}$ ]] || error_exit "$team: invalid team identifier"
@@ -137,7 +139,7 @@ function rebuild_msg {
     local msgpad=$(printf "%05d" $msg)
 
     [ -e "$team/messages/new/$seq.$msgpad" ] && { echo "warning: message $team/$seq.$msgpad already rebuilt" >&2; return 1; }
-    [ -e "$team/messages/done/$seq.$msgpad" ] && { echo "warning: message $team/$seq.$msgpad alreay processed" >&2; return 1; }
+    [ -e "$team/messages/done/$seq.$msgpad" ] && { echo "warning: message $team/$seq.$msgpad already processed" >&2; return 1; }
 
     mkdir -p "$team/messages/tmp" || exit 1
     mkdir -p "$team/messages/new" || exit 1
@@ -145,15 +147,21 @@ function rebuild_msg {
 
     local msgtmp
     local jsontmp
-    msgtmp=$(mktemp "$team/messages/tmp/$seq.$msgpad.XXXXXX")
+    msgtmp=$(mktemp "$dir/$team/messages/tmp/$seq.$msgpad.XXXXXX")
     [ $? -eq 0 ] || exit 1
-    jsontmp="json/tmp/$team-$seq.$msgpad.json"
+    jsontmp="$dir/json/tmp/$team-$seq.$msgpad.json"
+    magpitmp="$dir/magpi/tmp/$team-$seq.$msgpad"
 
-    "$PROCESSFRAG" "$team" "$team/fragments/partial" $seq $msg "$msgtmp" "$jsontmp"
-    [ $? -eq 0 ] || { echo "warning: message $team/$seq.$msgpad could not be processed" >&2; rm -f "$msgtmp"; rm -f "jsontmp"; return 1; }
+    echo "$PROCESSFRAG" "$team" "$team/fragments/partial" $seq $msg "$msgtmp" "$jsontmp" "$magpitmp"
+    "$PROCESSFRAG" "$team" "$team/fragments/partial" $seq $msg "$msgtmp" "$jsontmp" "$magpitmp"
+    [ $? -eq 0 ] || { echo "warning: message $team/$seq.$msgpad could not be processed" >&2; rm -f "$msgtmp" "$jsontmp" "$magpitmp"; return 1; }
 
-    mv "$jsontmp" "json/new/"
     mv "$msgtmp" "$team/messages/done/$seq.$msgpad"
+    [ -e "$jsontmp" ] && mv "$jsontmp" "json/new/"
+    if [ -e "$magpitmp" ]; then
+        (cd $(dirname "$SMAC") && "$SMAC" recipe decompress "$dir/magpi/recipe" "$magpitmp" "$dir/magpi/out")
+        mv "$magpitmp" "$dir/magpi/done"
+    fi
 
     local span=$("$FRAGINFO" msgspan "$team/fragments/partial" $seq $msg)
     local next
