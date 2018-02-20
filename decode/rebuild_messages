@@ -131,6 +131,19 @@ function check_done {
     done
 }
 
+function upload_magpi() {
+    # attempt to upload all reconstructed forms
+    for record in $( find "$dir/magpi/out" -name "*.xml" ); do
+        exec 201<"$record" || continue
+        flock 201 || continue
+        echo curl --fail -v -X POST -H 'Content-type: text/xml' --data-binary @"$record" "https://www.magpi.com/mobileApi/uploadData"
+        curl --fail -X POST -H 'Content-type: text/xml' --data-binary @"$record" "https://www.magpi.com/mobileApi/uploadData"
+        if [ $? -eq 0 ]; then
+            mv "$record" "$dir/magpi/uploaded"
+        fi
+    done
+}
+
 function rebuild_msg {
     local team=$1
     local seq=$2
@@ -144,6 +157,11 @@ function rebuild_msg {
     mkdir -p "$team/messages/tmp" || exit 1
     mkdir -p "$team/messages/new" || exit 1
     mkdir -p "$team/messages/done" || exit 1
+    mkdir -p "$dir/magpi/out" || exit 1
+    mkdir -p "$dir/magpi/done" || exit 1
+    mkdir -p "$dir/magpi/uploaded" || exit 1
+    mkdir -p "$dir/magpi/recipe" || exit 1
+    mkdir -p "$dir/magpi/tmp" || exit 1
 
     local msgtmp
     local jsontmp
@@ -161,6 +179,8 @@ function rebuild_msg {
     if [ -e "$magpitmp" ]; then
         (cd $(dirname "$SMAC") && "$SMAC" recipe decompress "$dir/magpi/recipe" "$magpitmp" "$dir/magpi/out")
         mv "$magpitmp" "$dir/magpi/done"
+
+        upload_magpi
     fi
 
     local span=$("$FRAGINFO" msgspan "$team/fragments/partial" $seq $msg)
