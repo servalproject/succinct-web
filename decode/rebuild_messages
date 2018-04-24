@@ -131,6 +131,17 @@ function check_done {
     done
 }
 
+function decompress_magpi() {
+    # attempt to decompress all forms
+    for record in $( find "$dir/magpi/new" ); do
+        exec 201<"$record" || continue
+        flock 201 || continue
+        echo "$SMAC" recipe decompress "$dir/magpi/recipe" "$record" "$dir/magpi/out"
+        (cd $(dirname "$SMAC") && "$SMAC" recipe decompress "$dir/magpi/recipe" "$record" "$dir/magpi/out") || continue
+        mv "$record" "$dir/magpi/done"
+    done
+}
+
 function upload_magpi() {
     # attempt to upload all reconstructed forms
     for record in $( find "$dir/magpi/out" -name "*.xml" ); do
@@ -162,6 +173,7 @@ function rebuild_msg {
     mkdir -p "$dir/magpi/uploaded" || exit 1
     mkdir -p "$dir/magpi/recipe" || exit 1
     mkdir -p "$dir/magpi/tmp" || exit 1
+    mkdir -p "$dir/magpi/new" || exit 1
 
     local msgtmp
     local jsontmp
@@ -177,9 +189,9 @@ function rebuild_msg {
     mv "$msgtmp" "$team/messages/done/$seq.$msgpad"
     [ -e "$jsontmp" ] && mv "$jsontmp" "json/new/"
     if [ -e "$magpitmp" ]; then
-        (cd $(dirname "$SMAC") && "$SMAC" recipe decompress "$dir/magpi/recipe" "$magpitmp" "$dir/magpi/out")
-        mv "$magpitmp" "$dir/magpi/done"
+        mv "$magpitmp" "$dir/magpi/new"
 
+        decompress_magpi
         upload_magpi
     fi
 
