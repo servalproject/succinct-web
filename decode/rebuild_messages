@@ -133,7 +133,7 @@ function check_done {
 
 function decompress_magpi() {
     # attempt to decompress all forms
-    for record in $( find "$dir/magpi/new" ); do
+    for record in $( find "$dir/magpi/new" -type f ); do
         exec 201<"$record" || continue
         flock 201 || continue
         echo "$SMAC" recipe decompress "$dir/magpi/recipe" "$record" "$dir/magpi/out"
