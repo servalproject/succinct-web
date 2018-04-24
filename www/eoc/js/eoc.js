@@ -71,17 +71,7 @@ function connect_socket() {
     socket.onopen = authenticate;
 
     socket.onclose = function () {
-        teams = {};
-        teamorder = [];
-        teamlinks = null;
-        $('#chat').hide();
-        $('#chat').data('teamid', '');
-        $('#teams-loading').show();
-        $('#teamlist').find('.team').not('.template').remove();
-        socket = false;
-        rpc.initialised = false;
-        // reconnect after 10s
-        setTimeout(connect_socket, 10000);
+        window.location.reload();
     };
 }
 
