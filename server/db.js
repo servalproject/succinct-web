@@ -180,6 +180,8 @@ async function fill_team_data(db, teams, chatlimit) {
     if (!Number.isInteger(chatlimit) || chatlimit < 0) {
         throw new Error('unexpected chat limit');
     }
+    if (teams === undefined || teams.length == 0)
+        return;
     teams.forEach(team => { team.members = []; });
     var idlist = teams.map(team => team.id);
     var idmap = swap_array_keys(idlist);
